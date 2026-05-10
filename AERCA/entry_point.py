@@ -49,7 +49,7 @@ def process_test_suite(TARGET_DIR, batch_time_str, API_KEY):
     
     hyperparams = {
         "test_suite": TARGET_DIR,
-        "bic_penalty_lambda": 1.0, 
+        "bic_penalty_lambda": 65, 
         "beam_width": 5,
         "max_iterations": 30,
         "max_age": 4,

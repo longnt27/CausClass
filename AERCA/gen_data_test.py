@@ -24,8 +24,8 @@ NUM_VARS = len(BEHAVIORS)
 BEH_IDX = {b: i for i, b in enumerate(BEHAVIORS)}
 
 STRENGTH_MAP = {
-    'high': 0.6,   
-    'medium': 0.4
+    'high': 0.3,   
+    'medium': 0.15
 }
 
 # ==========================================
@@ -198,16 +198,26 @@ def run_simulation(W, num_steps=1000):
     X = np.zeros((num_steps, NUM_VARS))
     
     W_var = np.copy(W)
-    np.fill_diagonal(W_var, 0.75) 
+    np.fill_diagonal(W_var, 0.5) # Dropped slightly to 0.5 so cross-edges pop more
     
-    baseline = np.random.uniform(2.0, 8.0, size=NUM_VARS)
+    # NEW: Heterogeneous Noise. 
+    # Assign a unique, random volatility (standard deviation) to each variable.
+    # E.g., 'Talk' might get 2.2, while 'Read' gets 0.8. 
+    noise_scales = np.random.uniform(0.5, 2.5, size=NUM_VARS)
     
-    X[0] = baseline
+    X[0] = np.zeros(NUM_VARS)
+    
     for t in range(1, num_steps):
-        X[t] = np.dot(X[t-1], W_var) + baseline + np.random.normal(0, 3.5, size=NUM_VARS)
-        X[t] = np.clip(X[t], 0.0, 100.0)
+        # Apply the unique noise scales instead of a flat 1.5
+        noise = np.random.normal(0, noise_scales)
+        X[t] = np.dot(X[t-1], W_var) + noise
         
-    return pd.DataFrame(X, columns=BEHAVIORS)
+    X = X[200:] # Burn-in
+    
+    X_shifted = X + 50.0
+    X_final = np.clip(X_shifted, 0.0, 100.0)
+        
+    return pd.DataFrame(X_final, columns=BEHAVIORS)
 
 # ==========================================
 # 6. TEST SUITE ORCHESTRATION
@@ -217,7 +227,7 @@ def generate_test_suite(num_tests=5):
     for i in range(num_tests):
         folder = get_next_test_folder()
         try:
-            sanitized_edges, context = generate_valid_graph_from_llm(min_edges=4, max_edges=6)
+            sanitized_edges, context = generate_valid_graph_from_llm(min_edges=2, max_edges=4)
             
             W, A = build_matrices(sanitized_edges)
             df = run_simulation(W, num_steps=1000)
