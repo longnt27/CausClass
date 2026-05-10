@@ -4,3 +4,8 @@ AERCA/datasets
 data
 .env
 AERCA/.env
+AERCA/saved_models
+AERCA/synth_data
+AERCA/wandb
+*__pycache__*
+*.DS_Store
