@@ -1,11 +1,5 @@
-AERCA/datasets
-AERCA/logs
-AERCA/datasets
-data
+.DS_Store
+__pycache__/
+*.py[cod]
 .env
-AERCA/.env
-AERCA/saved_models
-AERCA/synth_data
-AERCA/wandb
-*__pycache__*
-*.DS_Store
+output/saved_models/
