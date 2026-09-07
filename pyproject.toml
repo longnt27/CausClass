@@ -18,7 +18,7 @@ dependencies = [
 
 [project.optional-dependencies]
 llm = ["google-genai>=1.0,<2"]
-vision = ["torchvision>=0.21,<1", "opencv-python>=4.9,<5", "ultralytics>=8.2,<9", "matplotlib>=3.8,<4"]
+vision = ["torchvision>=0.21,<1", "opencv-python>=4.9,<6", "ultralytics>=8.2,<9", "matplotlib>=3.8,<4"]
 tracking = ["wandb>=0.17,<1"]
 dashboard = ["streamlit>=1.40,<2", "plotly>=5.24,<7"]
 dev = ["pytest>=8,<10", "pytest-cov>=6,<8", "ruff==0.12.12", "build>=1.2,<2"]
