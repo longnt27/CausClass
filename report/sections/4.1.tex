@@ -1,0 +1,49 @@
+Stage 1 được đánh giá như một bài toán phát hiện hành vi trong ảnh lớp học. Mục tiêu của phần này là xác định dữ liệu, nhãn và chỉ số dùng cho nghiên cứu cắt lớp YOLO26n-MHSA ở Mục 4.2. Hai bộ dữ liệu được sử dụng là bộ dữ liệu lớp học cục bộ đã làm sạch và bộ dữ liệu SCB \cite{yang2025scbdataset}. Do hai bộ dữ liệu có không gian nhãn khác nhau, so sánh chính giữa YOLO26n và YOLO26n-MHSA chỉ được thực hiện trên năm nhãn chung: \textit{Read}, \textit{Write}, \textit{Phone}, \textit{Bow} và \textit{Lean}.
+
+Theo mô tả gốc, SCB-Dataset là bộ dữ liệu công khai cho hành vi học sinh và giáo viên trong lớp học, gồm hai nhánh chính: phát hiện đối tượng và phân loại ảnh. Bài báo công bố quy mô tổng thể lớn: nhánh phát hiện đối tượng có 13,330 ảnh và 122,977 nhãn, còn nhánh phân loại ảnh có 21,019 ảnh \cite{yang2025scbdataset}. Tuy nhiên, con số này là quy mô của toàn bộ SCB-Dataset, bao gồm cả hành vi học sinh, hành vi giáo viên, các lớp ngữ cảnh như \textit{screen}, \textit{blackboard}, và cả nhánh phân loại ảnh. Nó không đồng nghĩa với số mẫu dùng trực tiếp cho từng nhóm nhãn học sinh trong nghiên cứu cắt lớp của đồ án.
+
+Điểm cần lưu ý trong bài gốc là nhánh phát hiện đối tượng của SCB không có một split train/validation toàn cục có ý nghĩa như một bộ detection thông thường. Do mất cân bằng lớp, đặc biệt ở các lớp phổ biến như \textit{read} và \textit{write}, tác giả chỉ gán nhãn \textit{read}/\textit{write} trong một phần ảnh, trong khi các lớp hiếm như \textit{discuss} được gán nhãn đầy đủ hơn. Vì vậy, SCB được chia thành nhiều sub-part, mỗi sub-part có cách chia train/validation riêng; bài gốc cũng nêu rằng tổng số train/validation của toàn bộ nhánh object detection không có nhiều ý nghĩa tham chiếu thực nghiệm \cite{yang2025scbdataset}.
+
+Trong đồ án này, phần SCB dùng cho Stage 1 là tập con/phiên bản đã ánh xạ về sáu nhãn phù hợp với bài toán so sánh detector: \textit{Hand}, \textit{Read}, \textit{Write}, \textit{Phone}, \textit{Bow} và \textit{Lean}. Do đó, các số liệu SCB trong Bảng~\ref{tab:stage1-dataset-stats} và Bảng~\ref{tab:stage1-dataset-splits} là thống kê của tập con SCB thực sự được dùng trong đồ án, không phải quy mô đầy đủ mà bài SCB-Dataset công bố. Bộ dữ liệu Local được làm sạch bằng cách loại bỏ lớp \textit{Hand} do mất cân bằng cao, còn lại sáu nhãn: \textit{Read}, \textit{Write}, \textit{Phone}, \textit{Bow}, \textit{Lean} và \textit{Talk}. Như vậy, Local có \textit{Talk} nhưng không giữ \textit{Hand}, trong khi tập SCB dùng trong đồ án có \textit{Hand} nhưng không có \textit{Talk}. Nếu so sánh trực tiếp toàn bộ nhãn, kết quả sẽ bị trộn giữa khác biệt mô hình và khác biệt không gian nhãn. Vì vậy, các bảng nghiên cứu cắt lớp chỉ báo cáo macro average trên năm nhãn chung.
+
+\begin{table}[htbp]
+\centering
+\caption{Thống kê tập dữ liệu dùng trong Stage 1 sau khi ánh xạ và làm sạch nhãn.}
+\label{tab:stage1-dataset-stats}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrp{0.42\linewidth}}
+\toprule
+\textbf{Bộ dữ liệu} & \textbf{Ảnh} & \textbf{Instance} & \textbf{Số lớp} & \textbf{Nhãn} \\
+\midrule
+Local đã làm sạch & 544 & 10,929 & 6 & Read, Write, Phone, Bow, Lean, Talk \\
+SCB dùng trong đồ án & 2,132 & 35,225 & 6 & Hand, Read, Write, Phone, Bow, Lean \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Bảng~\ref{tab:stage1-dataset-splits} trình bày chi tiết split và phân bố instance nổi bật. Local gồm 436 ảnh huấn luyện và 108 ảnh validation. Tập SCB dùng trong đồ án gồm 1,492 ảnh huấn luyện, 213 ảnh validation và 427 ảnh test. Trong Local đã làm sạch, \textit{Phone} chiếm nhiều nhất với 5,537 instance, tiếp theo là \textit{Talk} với 2,230 và \textit{Bow} với 1,897 instance. Trong tập SCB dùng trong đồ án, \textit{Read} và \textit{Phone} chiếm ưu thế với lần lượt 14,166 và 10,464 instance. Sự lệch phân bố này cho thấy macro average theo nhãn chung là lựa chọn phù hợp hơn so với micro average toàn bộ instance.
+
+\begin{table}[htbp]
+\centering
+\caption{Split và đặc điểm phân bố của hai bộ dữ liệu phát hiện hành vi.}
+\label{tab:stage1-dataset-splits}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrp{0.38\linewidth}}
+\toprule
+\textbf{Bộ dữ liệu} & \textbf{Train} & \textbf{Validation} & \textbf{Test} & \textbf{Đặc điểm phân bố} \\
+\midrule
+Local đã làm sạch & 436 & 108 & -- & Phone chiếm nhiều nhất với 5,537 instance; tiếp theo là Talk với 2,230 và Bow với 1,897 instance. \\
+SCB dùng trong đồ án & 1,492 & 213 & 427 & Read và Phone chiếm ưu thế với lần lượt 14,166 và 10,464 instance. \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Các chỉ số phát hiện được tính theo chuẩn phát hiện đối tượng. Precision và Recall được định nghĩa bởi
+\begin{equation}
+\label{eq:detector-precision-recall}
+    \mathrm{Precision}=\frac{TP}{TP+FP}, \qquad
+    \mathrm{Recall}=\frac{TP}{TP+FN},
+\end{equation}
+trong đó \(TP\) là phát hiện đúng, \(FP\) là phát hiện sai và \(FN\) là hành vi bị bỏ sót. mAP@50 tính trung bình Average Precision tại ngưỡng IoU 0.5, còn mAP@50--95 lấy trung bình AP trên các ngưỡng IoU từ 0.5 đến 0.95 theo tinh thần đánh giá COCO \cite{lin2014coco}. Vì vậy, mAP@50--95 nghiêm ngặt hơn và phản ánh cả chất lượng định vị hộp bao, không chỉ khả năng phân loại đúng hành vi.

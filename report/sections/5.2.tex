@@ -1,0 +1,16 @@
+Mặc dù kết quả khả quan, đồ án vẫn có một số giới hạn quan trọng. Thứ nhất, đánh giá trên video lớp học thật còn hạn chế về quy mô, trong khi phần kiểm chứng định lượng đồ thị chủ yếu dựa trên benchmark tổng hợp do thiếu ground truth nhân quả hoặc ground truth liên kết thời gian do chuyên gia gán nhãn. Điều này có nghĩa là F1 đồ thị phản ánh khả năng khôi phục cấu trúc trong điều kiện mô phỏng có kiểm soát, chưa đủ để khẳng định độ chính xác cấu trúc trên mọi lớp học thật.
+
+Thứ hai, quá trình xây dựng đồ thị nhạy với sai số của detector, độ thưa của quan sát và lựa chọn độ dài time bin. Chuỗi thời gian đầu vào của Stage 2 không phải quan sát trực tiếp của hành vi thật, mà là quan sát qua detector và tracker. Có thể mô tả đơn giản như
+\begin{equation}
+\label{eq:detector-noise-model}
+    \widetilde{X}=X^{true}+\eta_{det},
+\end{equation}
+trong đó \(\eta_{det}\) là nhiễu do bỏ sót, phát hiện sai, phát hiện trùng, che khuất và góc quay. Nếu nhiễu này có cấu trúc theo thời gian, đồ thị học từ \(\widetilde{X}\) có thể khác đồ thị học từ \(X^{true}\).
+
+Thứ ba, dữ liệu phát hiện trong đồ án có không gian nhãn khác nhau giữa Local và SCB, nên nghiên cứu cắt lớp chính chỉ báo cáo trên năm nhãn chung. Tập Local cũng có số ảnh huấn luyện tương đối nhỏ, vì vậy kết quả detector nên được xem như đánh giá thăm dò cho biến thể kiến trúc YOLO26n-MHSA, không phải kết luận cuối cùng cho mọi điều kiện lớp học.
+
+Thứ tư, mô hình tổng hợp VAR(1) và time bin 4 giây là xấp xỉ kỹ thuật để tạo chuỗi kiểm thử ổn định và có ground truth. Nó không hàm ý rằng hành vi lớp học thật chỉ phụ thuộc vào bin ngay trước đó hoặc quan hệ giữa hành vi luôn tuyến tính. Các yếu tố như hoạt động của giáo viên, âm thanh, nội dung bài học, vị trí camera và bối cảnh lớp học có thể ảnh hưởng đến hành vi nhưng chưa được đo trong pipeline hiện tại.
+
+Thứ năm, LLM vẫn có thể mang thiên lệch prior dù đã tách vai trò sinh ground truth và vai trò tìm kiếm, ngẫu nhiên hóa ngữ cảnh, dùng tabu list và kiểm chứng bằng AERCA. Các đề xuất của LLM có thể làm giảm không gian tìm kiếm, nhưng cũng có thể bỏ qua quan hệ ít quen thuộc hoặc ưu tiên quan hệ nghe hợp lý. Vì vậy, mọi kết quả LLM-guided phải được hiểu là kết quả của một quá trình đề xuất--kiểm chứng, không phải bằng chứng độc lập từ tri thức ngôn ngữ.
+
+Cuối cùng, các quan hệ được phát hiện nên được diễn giải là liên kết thời gian được dữ liệu quan sát hỗ trợ, không phải hiệu ứng nhân quả dứt khoát. Điểm BIC-style là công cụ chọn mô hình, không phải kiểm định ý nghĩa thống kê đầy đủ; trọng số cạnh là hệ số tương đối của mô hình, không phải mức tác động sư phạm; và báo cáo tự động chỉ nên được dùng như hướng dẫn kiểm tra video, không phải kết luận thay con người.

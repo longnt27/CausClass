@@ -1,0 +1,68 @@
+Mục này kiểm tra giả thuyết rằng việc bổ sung MHSA giúp YOLO26n khai thác thông tin không cục bộ trong ảnh lớp học, đặc biệt khi tín hiệu hành vi phân tán giữa tư thế đầu, tay, mặt bàn và vật thể xung quanh. Bảng~\ref{tab:detection-results-common-labels} trình bày kết quả tổng thể của YOLO26n và YOLO26n-MHSA trên năm nhãn chung giữa hai bộ dữ liệu. Trên Local, YOLO26n-MHSA tăng Recall thêm 0.0646, mAP@50 thêm 0.0410 và mAP@50--95 thêm 0.0416. Trên SCB, mức tăng nhỏ hơn nhưng vẫn dương: Recall tăng 0.0630, mAP@50 tăng 0.0090 và mAP@50--95 tăng 0.0116.
+
+\begin{table}[htbp]
+\centering
+\caption{Hiệu năng YOLO26n và YOLO26n-MHSA trên năm nhãn chung.}
+\label{tab:detection-results-common-labels}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llrrrr}
+\toprule
+\textbf{Bộ dữ liệu} & \textbf{Mô hình} & \textbf{Precision} & \textbf{Recall} & \textbf{mAP@50} & \textbf{mAP@50--95} \\
+\midrule
+\multirow{2}{*}{Local} & YOLO26n & 0.8296 & 0.7922 & 0.8320 & 0.6550 \\
+& YOLO26n-MHSA & 0.8240 & \textbf{0.8568} & \textbf{0.8730} & \textbf{0.6966} \\
+\midrule
+\multirow{2}{*}{SCB} & YOLO26n & 0.8614 & 0.8292 & 0.8994 & 0.6980 \\
+& YOLO26n-MHSA & 0.8506 & \textbf{0.8922} & \textbf{0.9084} & \textbf{0.7096} \\
+\midrule
+\multirow{2}{*}{Trung bình} & YOLO26n & 0.8455 & 0.8107 & 0.8657 & 0.6765 \\
+& YOLO26n-MHSA & 0.8373 & \textbf{0.8745} & \textbf{0.8907} & \textbf{0.7031} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Tính trung bình trên hai bộ dữ liệu, YOLO26n-MHSA tăng Recall 0.0638, mAP@50 0.0250 và mAP@50--95 0.0266. Precision giảm nhẹ từ 0.8455 xuống 0.8373. Kết quả này cho thấy lợi ích chính của MHSA nằm ở khả năng thu hồi hành vi và chất lượng mAP, không phải ở Precision. Điều này phù hợp với kỳ vọng rằng attention giúp mô hình phát hiện thêm các trường hợp có tín hiệu phân tán hoặc bị che khuất một phần, nhưng cũng có thể tạo thêm false positive.
+
+Mức cải thiện trung bình được tính trực tiếp từ hai bộ dữ liệu. Ví dụ, với Recall:
+\begin{equation}
+\label{eq:average-recall-gain}
+    \Delta R_{avg}=\frac{(0.8568-0.7922)+(0.8922-0.8292)}{2}=0.0638.
+\end{equation}
+Tương tự, \(\Delta\mathrm{mAP@50}=0.0250\) và \(\Delta\mathrm{mAP@50--95}=0.0266\). Việc báo cáo cả trung bình và từng bộ dữ liệu giúp tránh kết luận quá rộng từ một miền dữ liệu duy nhất.
+
+Bảng~\ref{tab:detection-results-classwise} trình bày ảnh hưởng theo từng nhãn. Trên Local, cải thiện rõ nhất xuất hiện ở \textit{Read}, \textit{Write} và \textit{Lean}. Đây là các nhãn thường cần kết hợp nhiều vùng thị giác như đầu, tay, tài liệu, tư thế thân người và mặt bàn. Trên SCB, tác động của MHSA nhỏ hơn; hầu hết nhãn tăng nhẹ, nhưng \textit{Bow} giảm 0.010 ở mAP@50 và 0.004 ở mAP@50--95.
+
+\begin{table}[htbp]
+\centering
+\caption{mAP theo từng nhãn sau khi bổ sung MHSA vào YOLO26n.}
+\label{tab:detection-results-classwise}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llrrrr}
+\toprule
+\textbf{Bộ dữ liệu} & \textbf{Nhãn} & \textbf{YOLO26n mAP@50} & \textbf{MHSA mAP@50} & \textbf{YOLO26n mAP@50--95} & \textbf{MHSA mAP@50--95} \\
+\midrule
+\multirow{5}{*}{Local} & Read & 0.470 & \textbf{0.574} & 0.347 & \textbf{0.392} \\
+& Write & 0.842 & \textbf{0.919} & 0.679 & \textbf{0.732} \\
+& Phone & \textbf{0.973} & 0.970 & 0.784 & \textbf{0.797} \\
+& Bow & 0.915 & \textbf{0.938} & 0.687 & \textbf{0.714} \\
+& Lean & 0.960 & \textbf{0.964} & 0.778 & \textbf{0.848} \\
+\midrule
+\multirow{5}{*}{SCB} & Read & 0.863 & \textbf{0.876} & 0.677 & \textbf{0.690} \\
+& Write & 0.822 & \textbf{0.852} & 0.666 & \textbf{0.697} \\
+& Phone & 0.964 & \textbf{0.972} & 0.796 & \textbf{0.808} \\
+& Bow & \textbf{0.885} & 0.875 & \textbf{0.645} & 0.641 \\
+& Lean & 0.963 & \textbf{0.967} & 0.706 & \textbf{0.712} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Nếu xét riêng từng nhãn, cải thiện của MHSA có thể được ký hiệu
+\begin{equation}
+\label{eq:metric-difference}
+    \Delta_{d,k}^{m}=m_{d,k}^{MHSA}-m_{d,k}^{base},
+\end{equation}
+trong đó \(d\) là bộ dữ liệu, \(k\) là nhãn và \(m\) là chỉ số mAP. Giá trị \(\Delta_{Local,Read}^{mAP@50}=0.574-0.470=0.104\) là cải thiện lớn nhất trong bảng; \(\Delta_{Local,Write}^{mAP@50}=0.077\) cũng đáng chú ý. Với \textit{Lean}, mức tăng 0.070 ở mAP@50--95 cho thấy MHSA có thể hỗ trợ định vị ổn định hơn khi tư thế cơ thể là tín hiệu chính. Ngược lại, \(\Delta_{SCB,Bow}^{mAP@50}=0.875-0.885=-0.010\) cho thấy có trường hợp attention làm giảm hiệu năng.
+
+Như vậy, MHSA không nên được xem là thành phần luôn cải thiện mọi hành vi trong mọi điều kiện dữ liệu. Nó có lợi khi thông tin ngữ cảnh xa giúp phân biệt nhãn, nhưng có thể gây nhiễu khi nhãn phụ thuộc vào tín hiệu cục bộ rõ ràng hoặc khi dữ liệu huấn luyện chưa đủ đa dạng. Trong pipeline quan sát lớp học, tăng Recall và mAP có giá trị thực tiễn vì detector bỏ sót nhiều hành vi sẽ làm chuỗi thời gian \(X\) mất tín hiệu và khiến đồ thị khó phát hiện liên kết. Tuy nhiên, Precision giảm nhẹ cũng nhắc rằng các bước chuỗi thời gian, đồ thị và báo cáo phải tiếp tục được diễn giải như phân tích trên dữ liệu phát hiện có nhiễu, không phải bằng chứng tuyệt đối từ video.

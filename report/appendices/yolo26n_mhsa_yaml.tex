@@ -1,0 +1,51 @@
+Phụ lục này trình bày cấu hình kiến trúc YOLO26n-MHSA được sử dụng trong Stage 1. Cấu hình giữ phần lớn backbone và head của YOLO26n, đồng thời chèn mô-đun MHSA tại layer 20 trước khi hợp nhất đặc trưng cho lớp phát hiện cuối.
+
+\renewcommand{\lstlistingname}{Đoạn mã}
+\begin{lstlisting}[
+caption={Cấu hình YAML của YOLO26n-MHSA.},
+label={lst:yolo26n-mhsa-yaml},
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+keepspaces=true,
+frame=single,
+showstringspaces=false
+]
+topology_yaml = """
+nc: 6 
+scales:
+  n: [0.50, 0.25, 1024]
+backbone:
+  - [-1, 1, Conv, [64, 3, 2]]           # 0
+  - [-1, 1, Conv, [128, 3, 2]]          # 1
+  - [-1, 2, C3k2, [256, False, 0.25]]   # 2
+  - [-1, 1, Conv, [256, 3, 2]]          # 3
+  - [-1, 2, C3k2, [512, False, 0.25]]   # 4  
+  - [-1, 1, Conv, [512, 3, 2]]          # 5
+  - [-1, 2, C3k2, [512, True]]          # 6  
+  - [-1, 1, Conv, [1024, 3, 2]]         # 7
+  - [-1, 2, C3k2, [1024, True]]         # 8
+  - [-1, 1, SPPF, [1024, 5, 3, True]]   # 9
+  - [-1, 2, C2PSA, [1024]]              # 10 
+
+head:
+  - [-1, 1, nn.Upsample, [None, 2, 'nearest']]
+  - [[-1, 6], 1, Concat, [1]]           # 12
+  - [-1, 2, C3k2, [512, True]]          # 13 
+  - [-1, 1, nn.Upsample, [None, 2, 'nearest']]
+  - [[-1, 4], 1, Concat, [1]]           # 15
+  - [-1, 2, C3k2, [256, True]]          # 16 
+  
+  - [-1, 1, Conv, [256, 3, 2]]          # 17
+  - [[-1, 13], 1, Concat, [1]]          # 18
+  - [-1, 2, C3k2, [512, True]]          # 19
+  
+  - [-1, 1, MHSA, [128, 128]]           # 20 
+  
+  - [-1, 1, Conv, [512, 3, 2]]          # 21
+  - [[-1, 10], 1, Concat, [1]]          # 22
+  - [-1, 1, C3k2, [1024, True, 0.5, True]] # 23
+  
+  - [[16, 20, 23], 1, Detect, [nc]]     # 24
+"""
+\end{lstlisting}

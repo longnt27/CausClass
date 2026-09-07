@@ -1,0 +1,16 @@
+Hướng phát triển đầu tiên là mở rộng đánh giá trên các bộ dữ liệu lớp học lớn hơn, đa dạng hơn về trường học, môn học, vị trí camera, mật độ học sinh và điều kiện che khuất. Đối với Stage 1, cần thu thập thêm dữ liệu có nhãn thống nhất, chuẩn hóa không gian nhãn giữa các bộ dữ liệu và đánh giá thêm các biến thể attention để xác định vị trí chèn mô-đun tối ưu hơn. Việc có nhiều video thật hơn cũng cho phép kiểm tra độ ổn định của detector qua bối cảnh lớp học khác nhau.
+
+Đối với Stage 2, hướng tiếp theo là xây dựng hoặc thu thập ground truth liên kết thời gian do chuyên gia gán nhãn, thay vì chỉ dựa vào dữ liệu tổng hợp. Đồng thời, cần so sánh trực tiếp với các baseline mạnh hơn như PCMCI, PCMCI+ và DYNOTEARS trên cùng bộ dữ liệu, đánh giá độ nhạy với hệ số phạt cạnh, số epoch fine-tune, beam width và chiến lược chia train/validation. Những thí nghiệm này sẽ giúp tách rõ lợi ích của bộ sinh đề xuất LLM, masked AERCA và beam search.
+
+Một hướng kỹ thuật quan trọng là đánh giá bất định và độ ổn định của cạnh. Có thể chạy pipeline với nhiều độ dài bin \(\Delta t\), nhiều bootstrap hoặc nhiều lần suy luận detector, rồi đo độ ổn định của một cạnh bằng
+\begin{equation}
+\label{eq:edge-stability}
+    \mathrm{Stability}(e)=\frac{1}{M}\sum_{m=1}^{M}\mathbf{1}\{e\in E_m\},
+\end{equation}
+trong đó \(E_m\) là đồ thị học được ở cấu hình hoặc mẫu bootstrap thứ \(m\). Các cạnh có stability cao sẽ đáng tin cậy hơn trong báo cáo quan sát, còn các cạnh chỉ xuất hiện ở một cấu hình nên được trình bày với cảnh báo mạnh hơn.
+
+Một hướng mở rộng khác là xử lý tốt hơn quan sát thiếu và che khuất. Detector có thể bỏ sót hành vi khi học sinh bị che, vật thể nhỏ bị khuất hoặc camera không nhìn rõ bàn học. Các mô hình uncertainty-aware hoặc missing-data-aware có thể giúp Stage 2 phân biệt giữa ``không có hành vi'' và ``không quan sát được hành vi''. Điều này đặc biệt quan trọng với lớp học thật, nơi dữ liệu video hiếm khi sạch như dữ liệu mô phỏng.
+
+Về báo cáo quan sát, có thể phát triển giao diện cho phép người dùng nhảy trực tiếp từ một thống kê hoặc một cạnh đồ thị tới các đoạn video liên quan. Giáo viên hoặc nhà nghiên cứu cũng có thể phản hồi rằng một cạnh là hợp lý, không rõ hoặc không hợp lý sau khi xem video. Phản hồi này không biến hệ thống thành công cụ phán xét tự động, mà giúp hiệu chỉnh detector, bộ gom sự kiện, bộ tìm kiếm đồ thị và ngôn ngữ báo cáo theo nhu cầu quan sát thực tế.
+
+Cuối cùng, CausClass có thể được mở rộng sang dữ liệu giáo dục đa phương thức. Âm thanh lớp học, transcript, slide bài giảng, hoạt động của giáo viên và metadata của tiết học có thể cung cấp bối cảnh quan trọng mà video đơn lẻ không đo được. Kết hợp các nguồn này có thể giúp hệ thống phân biệt tốt hơn giữa hành vi giống nhau về hình ảnh nhưng khác ý nghĩa sư phạm, đồng thời cải thiện độ tin cậy của các nhận xét được sinh ra từ pipeline.
