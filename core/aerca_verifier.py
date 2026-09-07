@@ -1,181 +1,159 @@
-import torch
-import torch.nn as nn
-import numpy as np
+"""AERCA discovery and masked graph scoring, research protocol v2.
+
+Public matrices are [source, target]. SENNGC coefficients are [target, source].
+See docs/reproducibility.md before comparing to historical report results.
+"""
+
+from __future__ import annotations
+
 import copy
+from dataclasses import dataclass
+
+import numpy as np
+import torch
+
 from core.models.aerca import AERCA
+from utils.reproducibility import seed_everything, split_verifier_data
 
-# ==========================================
-# PHASE 0: BASELINE DISCOVERY (COMPUTE INTENSIVE)
-# ==========================================
-def extract_aerca_matrices(data_chunks, variables):
-    """
-    [PHASE 0 - STEP 1] RAW MATRIX EXTRACTION
-    Trains the AERCA Neural Network to discover the underlying Vector Autoregression (VAR) dynamics.
-    This is a computationally heavy operation (GPU intensive) and should be executed only ONCE per dataset.
-    
-    Returns:
-        est_matrix: Absolute median coefficients (used for edge detection via thresholding).
-        signed_matrix: Mean directional coefficients (used to determine positive/negative relationships).
-        dense_weights: The full state_dict of the trained model for Warm-Starting future phases.
-    """
-    print("\n[AERCA Engine] Initializing Neural Network for Raw Matrix Extraction...")
-    n_vars = len(variables)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
-    # Enforce strict determinism for reproducible scientific results
-    torch.manual_seed(42)
-    if torch.cuda.is_available(): 
-        torch.cuda.manual_seed_all(42)
-    
-    model = AERCA(num_vars=n_vars, hidden_layer_size=64, num_hidden_layers=2,
-                  device=device, window_size=1, stride=1, epochs=150, lr=0.005,
-                  data_name='init', causal_quantile=0.0)
-    
-    model._training(data_chunks)
-    model.eval()
-    
+
+@dataclass(frozen=True)
+class VerifierConfig:
+    seed: int = 42
+    dense_epochs: int = 150
+    masked_epochs: int = 15
+    hidden_layer_size: int = 64
+    num_hidden_layers: int = 2
+    lr: float = 0.005
+    device: str = "auto"
+
+    def __post_init__(self):
+        for value in (
+            self.dense_epochs,
+            self.masked_epochs,
+            self.hidden_layer_size,
+            self.num_hidden_layers,
+        ):
+            if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+                raise ValueError("epoch and layer sizes must be positive integers")
+        if not np.isfinite(self.lr) or self.lr <= 0:
+            raise ValueError("lr must be finite and positive")
+        if not 0 <= self.seed < 2**32:
+            raise ValueError("seed must be in [0, 2**32)")
+        if self.device not in ("auto", "cpu", "cuda"):
+            raise ValueError("device must be auto, cpu, or cuda")
+
+
+def _model(variables, config, *, masked=False):
+    if len(set(variables)) != len(variables):
+        raise ValueError("variable names must be unique")
+    seed_everything(config.seed)
+    device = config.device
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    return AERCA(
+        num_vars=len(variables),
+        hidden_layer_size=config.hidden_layer_size,
+        num_hidden_layers=config.num_hidden_layers,
+        device=torch.device(device),
+        window_size=1,
+        stride=1,
+        epochs=config.masked_epochs if masked else config.dense_epochs,
+        lr=config.lr,
+        data_name="masked" if masked else "init",
+        causal_quantile=0.0,
+    )
+
+
+def _source_target_matrices(model, chunk):
     with torch.no_grad():
-        _, _, _, encoder_coeffs, _, _, _, _ = model._testing_step(data_chunks[0], add_u=False)
-        # est_matrix defines the STRUCTURE (Skeleton)
-        est_matrix = torch.max(torch.median(torch.abs(encoder_coeffs), dim=0)[0], dim=0).values.cpu().numpy()
-        # signed_matrix defines the BEHAVIORAL NATURE (Positive/Negative correlation)
-        signed_matrix = torch.mean(torch.mean(encoder_coeffs, dim=0), dim=0).cpu().numpy()
+        coeffs = model._testing_step(chunk, add_u=False)[3]
+        magnitude = torch.max(torch.median(torch.abs(coeffs), dim=0)[0], dim=0).values
+        signed = coeffs.mean(dim=(0, 1))
+    # Matrix-vector multiplication inside SENNGC indexes output before input.
+    return magnitude.cpu().numpy().T.copy(), signed.cpu().numpy().T.copy()
 
-    # Prevent self-loops in the initial discovery phase
-    np.fill_diagonal(est_matrix, 0.0)
-    
-    # Return dense weights for warm-starting later graph-search evaluations.
-    return est_matrix, signed_matrix, copy.deepcopy(model.state_dict())
+
+def extract_aerca_matrices(data_chunks, variables, *, config=None):
+    config = config or VerifierConfig()
+    fit, _ = split_verifier_data(data_chunks, len(variables))
+    model = _model(variables, config)
+    model._training(fit, persist=False, calibrate=False)
+    model.eval()
+    magnitude, signed = _source_target_matrices(model, fit[0])
+    np.fill_diagonal(magnitude, 0.0)
+    return magnitude, signed, copy.deepcopy(model.state_dict())
+
 
 def build_baseline_graph(est_matrix, signed_matrix, variables, q_threshold):
-    """
-    [PHASE 0 - STEP 2] THRESHOLD PRUNING (LIGHTWEIGHT)
-    Applies a statistical percentile cutoff to the raw matrix to form the initial directed graph.
-    This operation is O(1) in terms of compute and can be iterated thousands of times for Grid Search.
-    """
-    n_vars = len(variables)
-    cutoff_val = np.quantile(est_matrix, q_threshold)
-    pred_dag = (est_matrix >= cutoff_val).astype(int)
-    
-    initial_edges = []
-    for i in range(n_vars):
-        for j in range(n_vars):
-            if pred_dag[i, j] == 1:
-                initial_edges.append({
-                    "source": variables[i], 
-                    "target": variables[j],
-                    "weight": float(signed_matrix[i, j])
-                })
-                
-    return initial_edges
+    """Threshold [source, target] strengths, excluding self/zero edges.
 
-def get_initial_graph_from_aerca(data_chunks, variables, default_threshold=0.75):
+    Quantiles still include diagonal zeros for compatibility with the historical
+    threshold setting. This is a directed temporal graph, not necessarily a DAG.
     """
-    [BACKWARD COMPATIBILITY WRAPPER]
-    Combines Step 1 and Step 2 for legacy scripts that expect a single call.
-    """
-    print(f"[AERCA Engine] Executing Phase 0 with a default threshold of {default_threshold}...")
-    
-    # Preserve dense model weights for masked verifier runs.
-    est_matrix, signed_matrix, dense_weights = extract_aerca_matrices(data_chunks, variables)
-    initial_edges = build_baseline_graph(est_matrix, signed_matrix, variables, q_threshold=default_threshold)
-    
-    print(f"[AERCA Engine] Baseline Discovery complete. Found {len(initial_edges)} initial edges.")
-    
-    # Return all discovery artifacts for the graph-search runners.
-    return initial_edges, dense_weights, est_matrix
+    estimate, signed = np.asarray(est_matrix), np.asarray(signed_matrix)
+    shape = (len(variables), len(variables))
+    if len(variables) < 2 or len(set(variables)) != len(variables):
+        raise ValueError("provide at least two unique variables")
+    if estimate.shape != shape or signed.shape != shape:
+        raise ValueError("matrix shapes must match the variables")
+    if not np.isfinite(estimate).all() or not np.isfinite(signed).all():
+        raise ValueError("matrices must be finite")
+    if (estimate < 0).any() or not 0 <= q_threshold <= 1:
+        raise ValueError("strengths must be nonnegative and quantile in [0, 1]")
+    selected = (estimate >= np.quantile(estimate, q_threshold)) & (estimate > 0)
+    np.fill_diagonal(selected, False)
+    return [
+        {"source": variables[i], "target": variables[j], "weight": float(signed[i, j])}
+        for i, j in zip(*np.nonzero(selected))
+    ]
 
-# ==========================================
-# PHASE 1 & 2: MASKED VALIDATION
-# ==========================================
+
+def get_initial_graph_from_aerca(data_chunks, variables, default_threshold=0.75, *, config=None):
+    magnitude, signed, weights = extract_aerca_matrices(data_chunks, variables, config=config)
+    edges = build_baseline_graph(magnitude, signed, variables, default_threshold)
+    return edges, weights, magnitude
+
+
 def create_mask_matrix(edge_list, var2idx, n_vars):
-    """Generates a binary adjacency mask to forcefully block backpropagation on rejected edges."""
-    mask = torch.zeros((n_vars, n_vars))
+    """Return a [source, target] mask. Autoregressive self effects stay enabled."""
+    if len(var2idx) != n_vars or set(var2idx.values()) != set(range(n_vars)):
+        raise ValueError("variable indices must be unique and contiguous")
+    mask = torch.eye(n_vars)
     for edge in edge_list:
-        if edge['source'] in var2idx and edge['target'] in var2idx:
-            mask[var2idx[edge['source']], var2idx[edge['target']]] = 1.0
-            
-    # Self-loops (Inertia) are inherently allowed in VAR models
-    mask.fill_diagonal_(1.0)
+        if edge.get("source") not in var2idx or edge.get("target") not in var2idx:
+            raise ValueError("edge contains an unknown variable")
+        mask[var2idx[edge["source"]], var2idx[edge["target"]]] = 1.0
     return mask
 
-def run_masked_aerca(data_chunks, edge_list, variables, init_weights=None):
-    """
-    Validates a proposed graph structure by forcing the AERCA model to predict 
-    the multivariate time-series using ONLY the allowed edges.
-    Calculates the Validation Mean Squared Error (MSE) to feed the BIC evaluation.
-    """
-    import copy
-    import torch
-    import torch.nn as nn
-    from core.models.aerca import AERCA
 
-    n_vars = len(variables)
-    var2idx = {v: i for i, v in enumerate(variables)}
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
-    # Keep seed handling deterministic for reproducible verifier scores.
-    torch.manual_seed(42)
-    if torch.cuda.is_available(): 
-        torch.cuda.manual_seed_all(42)
-        
-    # Use fewer epochs for lightweight masked fine-tuning.
-    model = AERCA(num_vars=n_vars, hidden_layer_size=64, num_hidden_layers=2,
-                  device=device, window_size=1, stride=1, epochs=15, lr=0.005,
-                  data_name='masked', causal_quantile=0.0)
-    
-    # Warm Start: Load previous neural state to accelerate convergence
+def run_masked_aerca(data_chunks, edge_list, variables, init_weights=None, *, config=None):
+    """Score a candidate on held-out graph-selection data, not a final test set.
+
+    Warm-start weights must come from this protocol's fit partition. Externally
+    supplied checkpoints cannot be automatically checked for data leakage.
+    """
+    config = config or VerifierConfig()
+    fit, score = split_verifier_data(data_chunks, len(variables))
+    var2idx = {name: i for i, name in enumerate(variables)}
+    model = _model(variables, config, masked=True)
     if init_weights is not None:
         model.load_state_dict(init_weights)
-        
-    # Apply the adjacency mask inside the SENNGC forward pass.
-    mask_tensor = create_mask_matrix(edge_list, var2idx, n_vars).to(device)
-    model.causal_mask = mask_tensor 
-    
-    # =================================================================
-    # 4. Train/validation split
-    # =================================================================
-    n_chunks = len(data_chunks)
-    train_size = max(1, int(n_chunks * 0.8))
-    train_chunks = data_chunks[:train_size]
-    val_chunks = data_chunks[train_size:]
-    
-    if len(val_chunks) == 0: 
-        val_chunks = data_chunks
-        
-    # Train only on the training split while enforcing the graph mask.
-    model._training(train_chunks)
-    
+    public_mask = create_mask_matrix(edge_list, var2idx, len(variables))
+    model.causal_mask = public_mask.T.to(model.device)
+    model._training(fit, persist=False, calibrate=False)
     model.eval()
-    total_mse = 0.0
-    
+    _, signed = _source_target_matrices(model, fit[0])
+    signed *= public_mask.numpy()
+    squared_error, count = 0.0, 0
     with torch.no_grad():
-        # Extract signed weights from the first chunk for sign-aware edge reporting.
-        _, _, _, encoder_coeffs, _, _, _, _ = model._testing_step(data_chunks[0], add_u=False)
-        signed_matrix = torch.mean(torch.mean(encoder_coeffs, dim=0), dim=0).cpu().numpy()
-
-        # Reapply the mask after extraction to remove any residual unmasked weights.
-        signed_matrix = signed_matrix * mask_tensor.cpu().numpy()
-        
-        mse_loss_fn = nn.MSELoss()
-        
-        # =================================================================
-        # 5. Evaluate MSE on the held-out validation split
-        # =================================================================
-        for chunk in val_chunks: 
-            nexts_hat, nexts, _, _, _, _, _ = model.forward(chunk, add_u=False)
-            loss = mse_loss_fn(nexts_hat, nexts)
-            total_mse += loss.item()
-            
-    # Calculate the true validation mean squared error
-    avg_mse = total_mse / len(val_chunks)
-    
-    # Inject learned weights back into the edge structure for Sign-Aware evaluation
-    updated_edges = []
-    for edge in edge_list:
-        i, j = var2idx[edge['source']], var2idx[edge['target']]
-        updated_edge = copy.deepcopy(edge)
-        updated_edge['weight'] = float(signed_matrix[i, j])
-        updated_edges.append(updated_edge)
-        
-    return avg_mse, len(updated_edges), copy.deepcopy(model.state_dict()), updated_edges
+        for chunk in score:
+            predictions, targets, *_ = model.forward(chunk, add_u=False)
+            squared_error += torch.sum((predictions - targets) ** 2).item()
+            count += targets.numel()
+    mse = squared_error / count
+    if not np.isfinite(mse):
+        raise ValueError("nonfinite verifier score")
+    updated = copy.deepcopy(edge_list)
+    for edge in updated:
+        edge["weight"] = float(signed[var2idx[edge["source"]], var2idx[edge["target"]]])
+    return mse, len(updated), copy.deepcopy(model.state_dict()), updated

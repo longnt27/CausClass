@@ -1,0 +1,17 @@
+.git
+.venv
+.env
+.env.*
+output
+report
+refs
+tests
+**/__pycache__
+**/*.pt
+**/*.pth
+**/*.mp4
+**/*.mov
+data/synth_data
+data/cvat_dataset
+build
+dist

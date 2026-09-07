@@ -8,61 +8,22 @@ from sklearn.metrics import roc_auc_score, average_precision_score, accuracy_sco
 
 
 def compute_kl_divergence(us, device: torch.device):
+    """KL(N(empirical mean, covariance) || N(0, I)), with diagonal jitter.
+
+    Protocol v2 corrects the historical log-determinant sign and factor 1/2.
+    The device argument remains for compatibility; computation follows us.device.
     """
-    Compute the KL divergence between the empirical distribution of the input samples
-    and an isotropic standard Gaussian distribution using PyTorch.
-
-    Parameters:
-    samples (Tensor): A 2D tensor with rows as samples and columns as features.
-
-    Returns:
-    Tensor: The KL divergence between the empirical distribution of the samples
-            and the standard Gaussian distribution.
-    """
-
-    # Calculate the empirical mean and covariance matrix of the samples
-    mean_p = torch.mean(us, dim=0)
-    cov_p = torch.cov(us.t())
-
-    # Dimensionality of the distribution
-    d = mean_p.shape[0]
-
-    eigenvalues = torch.linalg.eigvalsh(cov_p)
-    condition_number = eigenvalues.max() / eigenvalues.clamp(min=1e-9).min()
-    regularization_term = condition_number * 1e-6
-    cov_p += torch.eye(d, device=device) * regularization_term
-    # Ensure the covariance matrix is full rank
-    # cov_p += 1e-9 * torch.eye(d).to(device)
-
-    # Compute the trace term
-    trace_term = torch.trace(cov_p)
-
-    # Compute the product of means term (since mean_q is zero, this is just mean_p squared)
-    means_term = torch.dot(mean_p, mean_p)
-
-    # # Compute the determinant term
-    # log_det_cov_p = torch.logdet(cov_p)
-    try:
-        L = torch.linalg.cholesky(cov_p)
-        log_det_cov_p = 2 * torch.log(torch.diagonal(L)).sum()
-    except RuntimeError:
-        # Handle the case where Cholesky decomposition fails
-        log_det_cov_p = torch.logdet(cov_p)
-
-    # Compute the KL divergence using the formula
-    kl_div = means_term + trace_term - d + log_det_cov_p
-    if torch.isnan(kl_div).any():
-        print('nan')
-        print(f'mean_p: {mean_p}')
-        print(f'cov_p: {cov_p}')
-        print(f'trace_term: {trace_term}')
-        print(f'means_term: {means_term}')
-        print(f'log_det_cov_p: {log_det_cov_p}')
-        print(f'kl_div: {kl_div}')
-        raise ValueError('KL divergence is NaN')
-
-
-    return kl_div
+    if us.ndim != 2 or us.shape[0] < 2 or not torch.isfinite(us).all():
+        raise ValueError("KL requires at least two finite samples in a 2D tensor")
+    mean = us.mean(dim=0)
+    covariance = torch.atleast_2d(torch.cov(us.T))
+    dimension = us.shape[1]
+    jitter = torch.finfo(us.dtype).eps
+    covariance = covariance + jitter * torch.eye(dimension, device=us.device, dtype=us.dtype)
+    sign, logdet = torch.linalg.slogdet(covariance)
+    if sign <= 0 or not torch.isfinite(logdet):
+        raise ValueError("empirical covariance is not positive definite after regularization")
+    return 0.5 * (torch.trace(covariance) + mean.dot(mean) - dimension - logdet)
 
 
 def set_seed(seed=42):

@@ -27,17 +27,17 @@ class DualLogger(object):
         self.log_file.flush()
 
 def load_env_file():
-    """Loads environment variables from .env file."""
-    env_path = ENV_FILE
-    if os.path.exists(env_path):
-       with open(env_path, 'r', encoding='utf-8') as f:
-            for line in f:
-               if '=' in line and not line.startswith('#'):
-                    key, val = line.strip().split('=', 1)
-                    os.environ[key.strip()] = val.strip()
+    """Load .env without overriding caller/CI settings; support quotes/comments."""
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=ENV_FILE, override=False)
+
 
 def calculate_bic(mse, num_edges, num_samples, params_per_edge=80):
-    """Calculates the Bayesian Information Criterion (BIC)."""
+    """Historical BIC-style search proxy (not a calibrated model likelihood)."""
+    if not np.isfinite(mse) or mse < 0 or num_samples <= 1:
+        raise ValueError("MSE must be finite/nonnegative and num_samples > 1")
+    if not np.isfinite(params_per_edge) or params_per_edge < 0 or num_edges < 0:
+        raise ValueError("edge counts and penalties must be nonnegative")
     return num_samples * np.log(mse + 1e-8) + params_per_edge * num_edges * np.log(num_samples)
 
 def evaluate_dag(pred_edges, gt_file_path, variables):
@@ -93,6 +93,8 @@ def apply_edit(current_edges, edit):
     if "action" not in edit or "source" not in edit or "target" not in edit:
         return new_edges
         
+    if edit["source"] == edit["target"] or edit["action"] not in {"add", "delete"}:
+        return new_edges
     base_edge = {"source": edit["source"], "target": edit["target"]}
     
     if edit["action"] == "add":

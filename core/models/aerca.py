@@ -1,4 +1,5 @@
 import os
+import copy
 from core.models.senn import SENNGC
 import torch.nn as nn
 import torch
@@ -148,14 +149,21 @@ class AERCA(nn.Module):
 
         return loss
 
-    def _training(self, xs):
+    def _training(self, xs, *, persist=True, calibrate=True):
+        """Fit with internal early stopping; optionally avoid disk/calibration work."""
+        xs = np.asarray(xs, dtype=np.float32)
+        if xs.ndim != 3 or len(xs) == 0 or not np.isfinite(xs).all():
+            raise ValueError("training requires finite (chunks, time, variables) data")
         if len(xs) == 1:
             xs_train = xs[:, :int(0.8 * len(xs[0]))]
             xs_val = xs[:, int(0.8 * len(xs[0])):]
         else:
             xs_train = xs[:int(0.8 * len(xs))]
             xs_val = xs[int(0.8 * len(xs)):]
+        if xs_train.shape[1] <= 2 * self.window_size or xs_val.shape[1] <= 2 * self.window_size:
+            raise ValueError("training and early-stopping chunks are too short")
         best_val_loss = np.inf
+        best_weights = None
         count = 0
         for epoch in tqdm(range(self.epochs), desc=f'Epoch'):
             count += 1
@@ -164,6 +172,8 @@ class AERCA(nn.Module):
             for x in xs_train:
                 self.optimizer.zero_grad()
                 loss = self._training_step(x)
+                if not torch.isfinite(loss):
+                    raise ValueError("nonfinite training loss")
                 epoch_loss += loss.item()
                 loss.backward()
                 self.optimizer.step()
@@ -183,15 +193,20 @@ class AERCA(nn.Module):
                 logging.info(f'Saving model at epoch {epoch + 1}')
                 logging.info(f'Saving model name: {self.model_name}.pt')
                 best_val_loss = epoch_val_loss
-                torch.save(self.state_dict(), os.path.join(self.save_dir, f'{self.model_name}_{os.getpid()}.pt'))
+                best_weights = copy.deepcopy(self.state_dict())
+                if persist:
+                    torch.save(best_weights, os.path.join(self.save_dir, f'{self.model_name}_{os.getpid()}.pt'))
             if count >= 50:
                 print('Early stopping')
                 break
-        self.load_state_dict(torch.load(os.path.join(self.save_dir, f'{self.model_name}_{os.getpid()}.pt')))
+        if best_weights is None:
+            raise ValueError('no finite early-stopping loss; check data and configuration')
+        self.load_state_dict(best_weights)
         logging.info('Training complete')
-        self._get_recon_threshold(xs_val)
-        self._get_root_cause_threshold_encoder(xs_val)
-        self._get_root_cause_threshold_decoder(xs_val)
+        if calibrate:
+            self._get_recon_threshold(xs_val)
+            self._get_root_cause_threshold_encoder(xs_val)
+            self._get_root_cause_threshold_decoder(xs_val)
 
     def _testing_step(self, x, label=None, add_u=True):
         nexts_hat, nexts, encoder_coeffs, decoder_coeffs, prev_coeffs, kl_div, us = self.forward(x, add_u=add_u)

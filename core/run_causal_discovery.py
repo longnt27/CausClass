@@ -38,7 +38,7 @@ def run_causal_discovery(input_csv, output_json, api_key):
         return
 
     # Statically define behavioral variables (Strict mapping to Phase 1 output)
-    variables = ["Talk", "Read", "Phone", "Hand", "Lean", "Stand"]
+    variables = ["Talk", "Read", "Phone", "Write", "Lean", "Bow"]
     real_world_context = "Classroom physical interaction dynamics. Behaviors represent the percentage of students engaging in the specific action."
 
     # Data Preprocessing
