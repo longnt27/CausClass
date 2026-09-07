@@ -1,0 +1,455 @@
+\documentclass[a4paper,13pt,3p,twoside]{report}
+
+\usepackage{scrextend}
+\changefontsizes{13pt}
+\usepackage[utf8]{vietnam}
+\usepackage[top=2cm, bottom=2cm, left=3.5cm, right=2.5cm]{geometry}
+\usepackage{xurl}
+\usepackage{appendix}
+\usepackage{babel}
+\usepackage[table]{xcolor}
+\usepackage{outlines}
+\usepackage{graphicx}
+\usepackage{fancybox}
+\usepackage{indentfirst}
+\usepackage{amsthm}
+\usepackage{latexsym}
+\usepackage{amsmath, amssymb, amsfonts, amsbsy}
+\usepackage{times}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{titletoc}
+\usepackage{chngcntr}
+\usepackage{pdflscape}
+\usepackage{afterpage}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{capt-of}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{fancyhdr}
+\usepackage[font=small,labelfont=bf]{caption}
+\renewcommand{\figurename}{Hình}
+\renewcommand{\tablename}{Bảng}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage[nonumberlist, nopostdot, nogroupskip, acronym]{glossaries}
+\usepackage{glossary-superragged}
+\setglossarystyle{longheaderborder}
+\usepackage{setspace}
+\usepackage{parskip}
+\usepackage{tocbasic}
+
+\renewcommand{\bibname}{TÀI LIỆU THAM KHẢO}
+\usepackage[backend=biber,style=ieee]{biblatex}
+\addbibresource{references.bib}
+
+\makenoidxglossaries
+\newglossaryentry{aerca}{type=\acronymtype, name={AERCA}, description={Auto-Encoder for Root Causal Analysis}, first={Auto-Encoder for Root Causal Analysis (AERCA)}}
+\newglossaryentry{llm}{type=\acronymtype, name={LLM}, description={Large Language Model}, first={Large Language Model (LLM)}}
+\newglossaryentry{bic}{type=\acronymtype, name={BIC}, description={Bayesian Information Criterion}, first={Bayesian Information Criterion (BIC)}}
+\newglossaryentry{mse}{type=\acronymtype, name={MSE}, description={Mean Squared Error}, first={Mean Squared Error (MSE)}}
+\newglossaryentry{dag}{type=\acronymtype, name={DAG}, description={Directed Acyclic Graph}, first={Directed Acyclic Graph (DAG)}}
+\newglossaryentry{mhsa}{type=\acronymtype, name={MHSA}, description={Multi-Head Self-Attention}, first={Multi-Head Self-Attention (MHSA)}}
+\newglossaryentry{yolo}{type=\acronymtype, name={YOLO}, description={You Only Look Once}, first={You Only Look Once (YOLO)}}
+\newglossaryentry{iou}{type=\acronymtype, name={IoU}, description={Intersection over Union}, first={Intersection over Union (IoU)}}
+\newglossaryentry{map}{type=\acronymtype, name={mAP}, description={mean Average Precision}, first={mean Average Precision (mAP)}}
+\newglossaryentry{var}{type=\acronymtype, name={VAR}, description={Vector Autoregression}, first={Vector Autoregression (VAR)}}
+\newglossaryentry{nms}{type=\acronymtype, name={NMS}, description={Non-Maximum Suppression}, first={Non-Maximum Suppression (NMS)}}
+\newglossaryentry{json}{type=\acronymtype, name={JSON}, description={JavaScript Object Notation}, first={JavaScript Object Notation (JSON)}}
+
+\fancypagestyle{plain}{%
+\fancyhf{}
+\fancyfoot[RO,RE]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}}
+
+\setlength{\headheight}{18pt}
+
+\def\TITLE{ĐỒ ÁN TỐT NGHIỆP}
+\def\THESISTITLE{Suy luận tương quan với Mô hình Ngôn ngữ Lớn để Khám phá và Diễn giải hành vi học tập của học sinh trong lớp học}
+\def\AUTHOR{Nguyễn Trung Long}
+\def\STUDENTID{20224874}
+\def\PROGRAM{Khoa học máy tính}
+\def\DEPARTMENT{Khoa học máy tính}
+\def\SUPERVISOR{PGS. TS. Phạm Văn Hải}
+\def\SCHOOL{Công nghệ Thông tin và Truyền thông}
+\def\LOCATIONDATE{HÀ NỘI, 06/2026}
+
+\titleformat
+    {\chapter}
+    [hang]
+    {\centering\bfseries}
+    {CHƯƠNG \thechapter.\ }
+    {0pt}
+    {}
+    []
+\titlespacing*{\chapter}{0pt}{-20pt}{20pt}
+
+\titleformat
+    {\section}
+    [hang]
+    {\bfseries}
+    {\thechapter.\arabic{section}\ \ \ \ }
+    {0pt}
+    {}
+    []
+\titlespacing{\section}{0pt}{\parskip}{0.5\parskip}
+
+\titleformat
+    {\subsection}
+    [hang]
+    {\bfseries}
+    {\thechapter.\arabic{section}.\arabic{subsection}\ \ \ \ }
+    {0pt}
+    {}
+    []
+\titlespacing{\subsection}{30pt}{\parskip}{0.5\parskip}
+
+\renewcommand\thesubsubsection{\alph{subsubsection}}
+\titleformat
+    {\subsubsection}
+    [hang]
+    {\bfseries}
+    {\alph{subsubsection},\ }
+    {0pt}
+    {}
+    []
+\titlespacing{\subsubsection}{50pt}{\parskip}{0.5\parskip}
+
+\usepackage{hyperref}
+\hypersetup{pdfborder={0 0 0}}
+\hypersetup{pdftitle={\THESISTITLE}, pdfauthor={\AUTHOR}}
+\usepackage[all]{hypcap}
+
+\graphicspath{{figures/}{doan/Hinh_ve/}}
+\counterwithin{figure}{chapter}
+\counterwithin{table}{chapter}
+\numberwithin{equation}{chapter}
+
+\title{\bf \TITLE}
+\author{\AUTHOR}
+\setcounter{secnumdepth}{3}
+
+\theoremstyle{definition}
+\newtheorem{example}{Ví dụ}[chapter]
+
+\onehalfspacing
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{15pt}
+
+\newcommand{\makefrontcover}{%
+\begin{titlepage}
+\thispagestyle{empty}
+\begingroup
+\setlength{\parskip}{0pt}
+\begin{center}
+{\textbf{\large{ĐẠI HỌC BÁCH KHOA HÀ NỘI}}}\\[4cm]
+
+{\textbf{\huge{\TITLE}}}\\[1cm]
+\parbox{0.92\textwidth}{\centering\textbf{\Large \THESISTITLE}}\\[1cm]
+
+{\textbf{\large{\MakeUppercase{\AUTHOR}}}}\\
+{\large{MSSV: \STUDENTID}}\\[0.5cm]
+
+{\textbf{\large{Chương trình đào tạo: \PROGRAM}}}
+
+\vfill
+\begin{table}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{ll}
+\multicolumn{1}{c}{\textbf{Giảng viên hướng dẫn:}} & \SUPERVISOR \hspace{0.5cm} \\[0.5cm]
+\multicolumn{1}{l}{\textbf{Khoa:}} & \DEPARTMENT \hspace{0.5cm} \\[0.5cm]
+\multicolumn{1}{l}{\textbf{Trường:}} & \SCHOOL \hspace{0.5cm} \\[4.5cm]
+\multicolumn{2}{c}{\textbf{\LOCATIONDATE}}
+\end{tabular}%
+}
+\end{table}
+\end{center}
+\endgroup
+\end{titlepage}}
+
+\newcommand{\makeinsidecover}{%
+\begin{titlepage}
+\thispagestyle{empty}
+\begingroup
+\setlength{\parskip}{0pt}
+\begin{center}
+{\textbf{\large{ĐẠI HỌC BÁCH KHOA HÀ NỘI}}}\\[4cm]
+
+{\textbf{\huge{\TITLE}}}\\[1cm]
+\parbox{0.92\textwidth}{\centering\textbf{\Large \THESISTITLE}}\\[1cm]
+
+{\textbf{\large{\MakeUppercase{\AUTHOR}}}}\\
+{\large{MSSV: \STUDENTID}}\\[0.5cm]
+
+{\textbf{\large{Chương trình đào tạo: \PROGRAM}}}
+
+\vfill
+\begin{table}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{ll}
+\multicolumn{1}{c}{\textbf{Giảng viên hướng dẫn:}} & \SUPERVISOR \hspace{0.5cm} \underline{\hspace{3cm}} \\[0.5cm]
+& \multicolumn{1}{r}{Chữ kí GVHD} \\[0.5cm]
+\textbf{Khoa:} & \DEPARTMENT \\[0.5cm]
+\textbf{Trường:} & \SCHOOL \\[4cm]
+\multicolumn{2}{c}{\textbf{\LOCATIONDATE}}
+\end{tabular}%
+}
+\end{table}
+\end{center}
+\endgroup
+\end{titlepage}}
+
+\newcommand{\frontmattertitle}[1]{%
+\begin{center}
+    \Large{\textbf{#1}}\\
+\end{center}
+\vspace{1cm}}
+
+\newenvironment{nohyphenparagraphs}{%
+\begingroup
+\hyphenpenalty=10000
+\exhyphenpenalty=10000
+\emergencystretch=3em
+}{%
+\par
+\endgroup}
+
+\begin{document}
+
+\hypersetup{pageanchor=false}
+\makefrontcover
+\makeinsidecover
+
+\pagestyle{empty}
+\newpage
+\pagenumbering{gobble}
+\frontmattertitle{LỜI CẢM ƠN}
+Sau một thời gian học tập, nghiên cứu và thực hiện đồ án, em đã nhận được rất nhiều sự giúp đỡ, động viên và hỗ trợ từ các thầy cô, gia đình, bạn bè và những người đồng hành trong suốt quá trình thực hiện đề tài.
+
+Trước hết, em xin bày tỏ lòng biết ơn sâu sắc tới PGS. TS. Phạm Văn Hải đã định hướng nghiên cứu, đưa ra những góp ý quý báu và tạo điều kiện để em có cơ hội tiếp cận môi trường nghiên cứu khoa học cũng như hoàn thành đồ án này.
+
+Đặc biệt, em xin gửi lời cảm ơn chân thành tới TS. Lương Thị Hồng Lan, người đã trực tiếp hướng dẫn và đồng hành cùng em trong suốt quá trình thực hiện đề tài. Những buổi trao đổi định kỳ, những góp ý chuyên môn, sự hỗ trợ trong việc tìm kiếm tài liệu, giải quyết các khó khăn kỹ thuật cũng như những lời động viên kịp thời của cô đã giúp em từng bước vượt qua nhiều thử thách trong quá trình nghiên cứu, để em hoàn thiện đề tài và học hỏi thêm nhiều kiến thức, kinh nghiệm quý giá cho con đường học tập và nghiên cứu sau này.
+
+Em cũng xin chân thành cảm ơn các thầy cô, anh chị và các thành viên trong nhóm nghiên cứu đã tạo điều kiện thuận lợi về môi trường học thuật và những trao đổi chuyên môn hữu ích trong quá trình thực hiện đề tài.
+
+Bên cạnh đó, em xin gửi lời cảm ơn tới gia đình đã luôn yêu thương, động viên và là điểm tựa vững chắc để em có thể yên tâm học tập và theo đuổi những mục tiêu của mình. Em cũng xin cảm ơn bạn bè và những người thân thiết đã luôn sẵn sàng chia sẻ, hỗ trợ và đồng hành cùng em trong những giai đoạn khó khăn nhất của quá trình thực hiện đồ án.
+
+Mặc dù đã cố gắng hết sức, đồ án khó tránh khỏi những thiếu sót. Em rất mong nhận được những ý kiến đóng góp từ quý thầy cô để có thể tiếp tục hoàn thiện hơn trong tương lai.
+
+Em xin chân thành cảm ơn.
+
+\newpage
+\pagenumbering{gobble}
+\frontmattertitle{TÓM TẮT NỘI DUNG ĐỒ ÁN}
+Quan sát lớp học là một công cụ quan trọng để hiểu hành vi học tập của học sinh và động lực tương tác trong lớp, nhưng các giao thức quan sát truyền thống thường tốn nhiều công sức, khó mở rộng và chủ yếu dừng ở mã hóa hành vi mô tả. Mặc dù thị giác máy tính gần đây đã cải thiện đáng kể khả năng nhận diện hành vi lớp học tự động, các phương pháp hiện có vẫn còn hạn chế trong việc khám phá quan hệ thời gian giữa các hành vi và chuyển kết quả thành báo cáo quan sát có thể kiểm tra. Để giải quyết khoảng trống này, đồ án trình bày CausClass, một khung thống nhất tích hợp nhận diện hành vi lớp học, khám phá liên kết thời gian và tinh chỉnh đồ thị có hướng dẫn bởi mô hình ngôn ngữ lớn nhằm hỗ trợ phân tích lớp học dựa trên bằng chứng.
+
+Khung đề xuất gồm ba giai đoạn. Thứ nhất, bộ phát hiện YOLO26n được tăng cường bằng Multi-Head Self-Attention (MHSA) để cải thiện nhận diện hành vi trong môi trường lớp học đông người. Thứ hai, các sự kiện hành vi sau theo dõi được gom thành biểu diễn thời gian đa biến và phân tích bằng quy trình khám phá đồ thị dựa trên AERCA. Thứ ba, mô hình ngôn ngữ lớn được dùng như một tác nhân tinh chỉnh đồ thị dựa trên tri thức: mô hình chỉ đề xuất chỉnh sửa cấu trúc, còn các đồ thị ứng viên được kiểm chứng bằng khám phá thời gian có mặt nạ và tiêu chí chọn mô hình. Đồ thị cuối cùng sau đó được chuyển thành báo cáo quan sát lớp học theo nguyên tắc nêu bằng chứng trước và diễn giải thận trọng.
+
+Kết quả thực nghiệm trên các bộ dữ liệu hành vi lớp học cho thấy YOLO26n-MHSA cải thiện ổn định hiệu năng nhận diện so với detector gốc. Trên 100 bộ kiểm thử đồ thị thời gian tổng hợp có cấu trúc ground truth, tìm kiếm đồ thị có hướng dẫn bởi LLM đạt hiệu năng khôi phục đồ thị cao nhất so với các baseline dựa trên AERCA và tìm kiếm. Ngoài ra, case study trên video lớp học thật minh họa tính khả thi của việc chuyển các quan sát hành vi thành báo cáo quan hệ thời gian có thể truy vết. Các kết quả này gợi ý rằng việc kết hợp bằng chứng thị giác, khám phá phụ thuộc thời gian và tinh chỉnh đồ thị có hướng dẫn bởi tri thức là một hướng hứa hẹn, với điều kiện các liên kết được phát hiện vẫn được diễn giải như bằng chứng quan sát chứ không phải kết luận nhân quả chắc chắn.
+
+\begin{flushright}
+Sinh viên thực hiện\\
+\begin{tabular}{@{}c@{}}
+\textit{(Ký và ghi rõ họ tên)}
+\end{tabular}
+\end{flushright}
+
+\newpage
+\pagenumbering{gobble}
+\frontmattertitle{ABSTRACT}
+\begin{nohyphenparagraphs}
+Classroom observation is an important tool for understanding students' learning behaviors and interaction dynamics, yet traditional observation protocols are labor-intensive, difficult to scale, and often limited to descriptive behavior coding. Although recent computer vision methods have improved automatic classroom behavior recognition, existing approaches remain limited in discovering temporal relationships among behaviors and turning results into verifiable observation reports. To address this gap, this thesis presents CausClass, a unified framework that integrates classroom behavior detection, temporal graph discovery, and large-language-model-guided graph refinement for evidence-based classroom analytics.
+
+The proposed framework consists of three stages. First, a YOLO26n detector enhanced with Multi-Head Self-Attention (MHSA) improves behavior recognition in crowded classroom scenes. Second, tracked behavior events are aggregated into multivariate time-series representations and analyzed through an AERCA-based graph discovery procedure. Third, a large language model is used as a knowledge-guided graph refinement agent: it proposes structural edits, while candidate graphs are verified through masked temporal discovery and model-selection criteria. The final graph is then converted into a classroom observation report that presents evidence first and interprets temporal links cautiously.
+
+Experiments on classroom behavior datasets show that YOLO26n-MHSA consistently improves detection performance over the base detector. On 100 synthetic temporal graph benchmarks with known ground truth, LLM-guided graph search achieves the strongest graph recovery performance compared with AERCA-based and search-based baselines. In addition, a case study on real classroom video demonstrates the feasibility of turning observed behaviors into traceable reports of temporal relationships. These results suggest that combining visual evidence, temporal dependency discovery, and knowledge-guided graph refinement is a promising direction for next-generation classroom analytics systems, provided that discovered links are interpreted as observational evidence rather than definitive causal conclusions.
+\end{nohyphenparagraphs}
+
+\newpage
+\pagenumbering{gobble}
+\renewcommand*\contentsname{MỤC LỤC}
+\titlecontents{chapter}
+    [0.0cm]
+    {\bfseries\vspace{0.3cm}}
+    {{\bfseries{\scshape} CHƯƠNG \thecontentslabel.\ }}
+    {}
+    {\titlerule*[0.3pc]{.}\contentspage}
+\titlecontents{section}
+    [0.0cm]
+    {\vspace{0.3cm}}
+    {\thecontentslabel\ }
+    {}
+    {\titlerule*[0.3pc]{.}\contentspage}
+\titlecontents{subsection}
+    [1.0cm]
+    {\vspace{0.3cm}}
+    {\thecontentslabel\ }
+    {}
+    {\titlerule*[0.3pc]{.}\contentspage}
+\addtocontents{toc}{\protect\thispagestyle{empty}}
+\tableofcontents
+\thispagestyle{empty}
+\cleardoublepage
+
+\pagenumbering{roman}
+\renewcommand{\listfigurename}{DANH MỤC HÌNH VẼ}
+{\let\oldnumberline\numberline
+\renewcommand{\numberline}{Hình~\oldnumberline}
+\listoffigures}
+\newpage
+
+\renewcommand{\listtablename}{DANH MỤC BẢNG BIỂU}
+{\let\oldnumberline\numberline
+\renewcommand{\numberline}{Bảng~\oldnumberline}
+\listoftables}
+\newpage
+
+\glsaddall
+\renewcommand*{\acronymname}{DANH MỤC THUẬT NGỮ VÀ TỪ VIẾT TẮT}
+\renewcommand*{\entryname}{Thuật ngữ}
+\renewcommand*{\descriptionname}{Ý nghĩa}
+\printnoidxglossary[type=\acronymtype]
+
+\renewcommand\appendixname{PHỤ LỤC}
+\renewcommand\appendixpagename{PHỤ LỤC}
+\renewcommand\appendixtocname{PHỤ LỤC}
+
+\newpage
+\hypersetup{pageanchor=true}
+\pagenumbering{arabic}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\chaptermark}[1]{\markboth{CHƯƠNG \thechapter. #1}{}}
+\fancyhead[RE,LO]{\leftmark}
+\fancyfoot[RE,LO]{\thepage}
+
+\chapter{GIỚI THIỆU ĐỀ TÀI}
+
+Chương này trình bày lý do lựa chọn đề tài, các hạn chế của những hướng tiếp cận hiện có, mục tiêu nghiên cứu, định hướng giải pháp và các đóng góp chính của đồ án. Trọng tâm của chương là làm rõ bài toán đồ án giải quyết và vì sao cần một quy trình phân tích lớp học vừa tự động, vừa có khả năng kiểm chứng bằng bằng chứng quan sát.
+
+\section{Đặt vấn đề}
+\input{sections/1.1.tex}
+
+\section{Các giải pháp hiện tại và hạn chế}
+\input{sections/1.2.tex}
+
+\section{Mục tiêu và định hướng giải pháp}
+\input{sections/1.3.tex}
+
+\section{Đóng góp của đồ án}
+\input{sections/1.4.tex}
+
+\section{Bố cục đồ án}
+\input{sections/1.5.tex}
+
+\newpage
+\chapter{NỀN TẢNG LÝ THUYẾT}
+
+Chương này phân tích ngữ cảnh của bài toán và hệ thống hóa các nghiên cứu, kiến thức nền tảng cần thiết cho CausClass. Các nội dung được trình bày theo khung của mẫu đồ án: ngữ cảnh bài toán, kết quả nghiên cứu tương tự, sau đó là các nền tảng kỹ thuật về nhận diện hành vi, chuỗi thời gian và LLM hỗ trợ tìm kiếm đồ thị.
+
+\section{Ngữ cảnh của bài toán}
+\input{sections/2.1.tex}
+
+\section{Các kết quả nghiên cứu tương tự}
+\input{sections/2.2.tex}
+
+\section{Phát hiện hành vi dựa trên YOLO và attention}
+\input{sections/2.3.tex}
+
+\section{Chuỗi thời gian và khám phá liên kết dự báo}
+\input{sections/2.4.tex}
+
+\section{LLM hỗ trợ tìm kiếm và diễn giải đồ thị}
+\input{sections/2.5.tex}
+
+\newpage
+\chapter{PHƯƠNG PHÁP ĐỀ XUẤT}
+
+\section{Tổng quan giải pháp}
+\input{sections/3.1.tex}
+
+\section{Kiến trúc YOLO26n-MHSA}
+\input{sections/3.2.tex}
+
+\section{Theo dõi và xây dựng chuỗi thời gian}
+\input{sections/3.3.tex}
+
+\section{Trích xuất đồ thị baseline bằng AERCA}
+\input{sections/3.4.tex}
+
+\section{Tìm kiếm beam có hướng dẫn bởi LLM}
+\input{sections/3.5.tex}
+
+\newpage
+\chapter{ĐÁNH GIÁ THỰC NGHIỆM}
+
+\section{Dữ liệu cho Stage 1}
+\input{sections/4.1.tex}
+
+\section{Nghiên cứu cắt lớp cho Stage 1}
+\input{sections/4.2.tex}
+
+\section{Dữ liệu cho Stage 2}
+\input{sections/4.3.tex}
+
+\section{Nghiên cứu cắt lớp cho Stage 2}
+\input{sections/4.4.tex}
+
+\section{Case study video lớp học thật}
+\input{sections/4.5.tex}
+
+\newpage
+\chapter{KẾT LUẬN}
+
+\section{Kết luận}
+\input{sections/5.1.tex}
+
+\section{Giới hạn}
+\input{sections/5.2.tex}
+
+\section{Hướng phát triển trong tương lai}
+\input{sections/5.3.tex}
+
+\newpage
+\renewcommand\bibname{TÀI LIỆU THAM KHẢO}
+\printbibliography
+\phantomsection\addcontentsline{toc}{chapter}{TÀI LIỆU THAM KHẢO}
+
+\appendixpage
+\appendix
+\addappheadtotoc
+
+\titleformat{\chapter}
+    [hang]
+    {\centering\bfseries}
+    {\thechapter.\ }
+    {0pt}
+    {}
+    []
+\titlespacing*{\chapter}{0pt}{-20pt}{20pt}
+
+\titlecontents{chapter}
+    [0.0cm]
+    {\bfseries\vspace{0.3cm}}
+    {{\bfseries{\scshape} \thecontentslabel.\ }}
+    {}
+    {\titlerule*[0.3pc]{.}\contentspage}
+
+\chapter{FILE CẤU HÌNH YOLO26N-MHSA}
+\label{appendix:yolo26n-mhsa-yaml}
+\input{appendices/yolo26n_mhsa_yaml.tex}
+
+\chapter{CÁC PROMPT SỬ DỤNG TRONG HỆ THỐNG}
+\label{appendix:prompts}
+\input{appendices/prompts.tex}
+
+\chapter{HƯỚNG DẪN CÀI ĐẶT MÔI TRƯỜNG VÀ CHẠY THỬ NGHIỆM}
+\label{appendix:environment-setup}
+\input{appendices/environment_setup.tex}
+
+\end{document}

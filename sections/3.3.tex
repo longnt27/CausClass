@@ -1,0 +1,31 @@
+Đối với suy luận trên video thật, detector được kết hợp với ByteTrack. ByteTrack liên kết các phát hiện qua khung hình, bao gồm cả một số hộp có độ tin cậy thấp, nhờ đó giúp duy trì quỹ đạo đối tượng trong cảnh đông người và nhiều che khuất \,\cite{zhang2022bytetrack}. Khi một đoạn track kết thúc, pipeline lưu nó thành một sự kiện vi mô chứa định danh đối tượng, nhãn hành vi, thời gian bắt đầu, thời gian kết thúc và thông tin độ tin cậy.
+
+Một sự kiện vi mô có thể viết dưới dạng
+\begin{equation}
+\label{eq:tracked-event}
+    e=(u,b,t_a,t_b,\bar{s}),
+\end{equation}
+trong đó \(u\) là định danh track, \(b\) là nhãn hành vi, \([t_a,t_b]\) là khoảng thời gian sự kiện và \(\bar{s}\) là điểm tin cậy trung bình của các phát hiện thuộc sự kiện. Cách biểu diễn sự kiện theo đoạn thời gian giảm nhiễu so với đếm từng khung hình độc lập, đặc biệt khi video có FPS cao hoặc khi detector dao động nhẹ giữa các khung hình liên tiếp.
+
+Các sự kiện vi mô được gom vào các time bin có độ rộng cố định. Với time bin \(r\) và hành vi \(k\), tỉ lệ hành vi trong pipeline được tính là
+\begin{equation}
+\label{eq:time-bin-percentage}
+    X_{r,k}=100\times\frac{N_{r,k}}{\sum_{j=1}^{K}N_{r,j}},
+\end{equation}
+trong đó \(N_{r,k}\) là số sự kiện track của hành vi \(k\) chồng lấn với bin \(r\), và \(K\) là số hành vi được xét. Nếu trong một bin không có phát hiện nào, toàn bộ tỉ lệ hành vi của bin đó được đặt bằng 0. Các giá trị này là phần trăm của sự kiện hành vi được detector ghi nhận, không phải phần trăm chính xác số học sinh thật sự thực hiện hành vi trong lớp.
+
+Nếu xét toàn bộ video gồm \(T\) time bin, Stage 1 sinh ra ma trận chuỗi thời gian
+\begin{equation}
+\label{eq:time-series-matrix}
+    X\in\mathbb{R}^{T\times K}.
+\end{equation}
+Mỗi hàng là một lát cắt thời gian; mỗi cột là một nhãn hành vi. Chuỗi này giữ độ dài cố định theo video và là đầu vào trực tiếp cho Stage 2. Khi cần giảm ảnh hưởng của khác biệt tần suất giữa nhãn, có thể chuẩn hóa từng biến theo dạng
+\begin{equation}
+\label{eq:standardized-time-series}
+    \widetilde{X}_{t,k}=\frac{X_{t,k}-\mu_k}{\sigma_k+\epsilon},
+\end{equation}
+trong đó \(\mu_k\) và \(\sigma_k\) là trung bình và độ lệch chuẩn của hành vi \(k\), còn \(\epsilon\) là hằng số nhỏ để tránh chia cho 0. Tuy nhiên, chuỗi báo cáo cho người dùng vẫn được diễn giải trên thang phần trăm sự kiện phát hiện để dễ hiểu.
+
+Trong triển khai, Stage 1 lưu nhiều artifact trung gian để phục vụ kiểm toán, chẳng hạn khung debug, file sự kiện vi mô, chuỗi thời gian thô và metadata video. Các tham số cụ thể của bước suy luận, theo dõi và gom bin được trình bày trong Chương 4 cùng với thiết lập thực nghiệm. Nếu một cạnh đồ thị hoặc một câu trong báo cáo có vẻ bất thường, người dùng có thể kiểm tra liệu nó xuất phát từ mẫu phát hiện thật, từ nhiễu detector, hay từ cách gom sự kiện vào bin.
+
+Điểm cần nhấn mạnh là Stage 1 không tạo dữ liệu ``đúng tuyệt đối'' về hành vi lớp học. Chuỗi \(X\) là quan sát bị nhiễu qua detector và tracker. Nếu detector bỏ sót một hành vi, tần suất tương ứng trong \(X\) sẽ bị giảm; nếu detector phát hiện trùng hoặc sai nhãn, \(X\) sẽ chứa nhiễu. Vì vậy, các giai đoạn đồ thị và báo cáo phải được đọc như phân tích trên tín hiệu quan sát tự động, không phải trên ground truth hành vi của toàn lớp.

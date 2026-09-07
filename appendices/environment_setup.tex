@@ -1,0 +1,194 @@
+\markboth{PHỤ LỤC C. HƯỚNG DẪN CÀI ĐẶT}{}
+
+Phụ lục này trình bày hướng dẫn cài đặt môi trường, cấu hình khóa API và các lệnh chạy thử nghiệm chính của dự án CausClass. Nội dung chỉ tập trung vào các bước cần thiết để thiết lập và chạy các pipeline thực nghiệm.
+
+\section{Yêu cầu môi trường}
+
+Dự án nên được chạy với Python 3.11 nếu có thể. CausClass kết hợp YOLO và ByteTrack cho nhận diện và theo dõi hành vi. Hệ thống dùng Gemini 3 Flash cho sinh dữ liệu tổng hợp, DeepSeek cho đề xuất chỉnh sửa đồ thị và sinh báo cáo quan sát, đồng thời dùng AERCA như bộ kiểm chứng neural cho các đồ thị ứng viên.
+
+Trong dự án này, AERCA chỉ được dùng như máy kiểm chứng bên trong CausClass. Nếu sử dụng mã nguồn hoặc kết quả có liên quan tới AERCA, cần trích dẫn bài báo gốc của AERCA.
+
+\section{Cài đặt thư viện}
+
+Các bước cài đặt cơ bản như sau:
+
+\begin{lstlisting}[
+caption={Cài đặt môi trường Python cho CausClass.},
+label={lst:causclass-installation},
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+keepspaces=true,
+frame=single,
+showstringspaces=false
+]
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+\end{lstlisting}
+
+Với các thử nghiệm cần CUDA cho huấn luyện hoặc suy luận, cần cài đặt phiên bản PyTorch phù hợp với CUDA driver của máy từ trình chọn cài đặt chính thức của PyTorch, sau đó cài đặt các phụ thuộc còn lại của dự án bằng \texttt{requirements.txt}.
+
+\section{Cấu hình biến môi trường}
+
+Tạo tệp \texttt{.env} ở thư mục gốc của dự án để lưu khóa API:
+
+\begin{lstlisting}[
+caption={Cấu hình khóa API trong tệp .env.},
+label={lst:causclass-env},
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+keepspaces=true,
+frame=single,
+showstringspaces=false
+]
+GEMINI_API_KEY=your_gemini_key_here
+DEEPSEEK_API_KEY=your_deepseek_key_here
+\end{lstlisting}
+
+\texttt{GEMINI\_API\_KEY} được dùng cho bước sinh dữ liệu tổng hợp. Theo mặc định, bộ sinh dữ liệu dùng Gemini 3 Flash với mã mô hình \texttt{gemini-3-flash-preview}. Nếu Google thay đổi tên mô hình được khuyến nghị, có thể ghi đè bằng biến \texttt{GEMINI\_SYNTHETIC\_MODEL}.
+
+\texttt{DEEPSEEK\_API\_KEY} được dùng cho các đề xuất chỉnh sửa đồ thị và bước sinh báo cáo quan sát cuối cùng. Khi chỉ chạy thử cục bộ và không muốn ghi log lên Weights \& Biases, có thể đặt thêm biến sau:
+
+\begin{lstlisting}[
+caption={Tắt Weights \& Biases cho chạy thử cục bộ.},
+label={lst:causclass-wandb-disabled},
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+keepspaces=true,
+frame=single,
+showstringspaces=false
+]
+WANDB_MODE=disabled
+\end{lstlisting}
+
+\section{Các lệnh sử dụng thường gặp}
+
+\subsection{Chạy pipeline video đầu-cuối}
+
+Lệnh sau chạy toàn bộ pipeline từ video lớp học tới các kết quả đầu ra, bao gồm phát hiện hành vi, xây dựng chuỗi thời gian, tìm kiếm đồ thị và lưu các artifact:
+
+\begin{lstlisting}[
+caption={Chạy pipeline đầu-cuối trên một video lớp học.},
+label={lst:causclass-end-to-end},
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+keepspaces=true,
+frame=single,
+showstringspaces=false
+]
+python -m core.end_to_end_pipeline \
+  --video data/videos/classroom.mp4 \
+  --model data/best.pt \
+  --output_dir output/runs/classroom_001
+\end{lstlisting}
+
+\subsection{Chỉ trích xuất động học hành vi từ video}
+
+Nếu chỉ cần chạy pha nhận diện và trích xuất chuỗi thời gian hành vi từ video, sử dụng lệnh sau:
+
+\begin{lstlisting}[
+caption={Trích xuất động học hành vi từ video.},
+label={lst:causclass-extract-video-dynamics},
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+keepspaces=true,
+frame=single,
+showstringspaces=false
+]
+python -m data.extract_video_dynamics data/videos/classroom.mp4 \
+  --model data/best.pt \
+  --output-dir output/phase1/classroom_001
+\end{lstlisting}
+
+\subsection{Chạy khám phá đồ thị trên tệp CSV có sẵn}
+
+Khi đã có chuỗi thời gian hành vi ở dạng CSV, có thể chạy riêng bước khám phá đồ thị:
+
+\begin{lstlisting}[
+caption={Chạy khám phá đồ thị từ chuỗi thời gian hành vi có sẵn.},
+label={lst:causclass-causal-discovery},
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+keepspaces=true,
+frame=single,
+showstringspaces=false
+]
+python -m core.run_causal_discovery \
+  --input output/phase1/classroom_001/classroom_multivariate_timeseries.csv \
+  --output output/final_causal_graph.json
+\end{lstlisting}
+
+\subsection{Sinh dữ liệu VAR tổng hợp bằng Gemini 3 Flash}
+
+Lệnh sau sinh các bộ dữ liệu VAR tổng hợp đã căn chỉnh với ontology hành vi:
+
+\begin{lstlisting}[
+caption={Sinh dữ liệu tổng hợp bằng Gemini 3 Flash.},
+label={lst:causclass-generate-synthetic-data},
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+keepspaces=true,
+frame=single,
+showstringspaces=false
+]
+python -m data.generate_synthetic_data -n 10 --output-dir data/synth_data
+\end{lstlisting}
+
+\subsection{Chạy một lượt tìm kiếm đồ thị trên bộ tổng hợp}
+
+Lệnh sau chạy một lượt tìm kiếm đồ thị trên synthetic suite ở chế độ debug và một worker:
+
+\begin{lstlisting}[
+caption={Chạy một lượt tìm kiếm đồ thị trên synthetic suite.},
+label={lst:causclass-synthetic-search},
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+keepspaces=true,
+frame=single,
+showstringspaces=false
+]
+python -m core.run_synthetic_search --debug 1 --workers 1
+\end{lstlisting}
+
+\subsection{Chạy tìm kiếm lưới cho BIC lambda}
+
+Lệnh sau chạy tìm kiếm lưới cho hệ số phạt BIC lambda với giới hạn số test:
+
+\begin{lstlisting}[
+caption={Chạy tìm kiếm lưới cho BIC lambda.},
+label={lst:causclass-grid-search-bic-lambda},
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+keepspaces=true,
+frame=single,
+showstringspaces=false
+]
+python -m core.grid_search_bic_lambda --test_limit 10 --workers 1
+\end{lstlisting}
+
+\subsection{Quét ngưỡng verifier AERCA}
+
+Lệnh sau chạy sweep ngưỡng cho baseline verifier dựa trên AERCA:
+
+\begin{lstlisting}[
+caption={Chạy sweep ngưỡng AERCA verifier.},
+label={lst:causclass-sweep-aerca-thresholds},
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+keepspaces=true,
+frame=single,
+showstringspaces=false
+]
+python -m core.sweep_aerca_thresholds --workers 1
+\end{lstlisting}

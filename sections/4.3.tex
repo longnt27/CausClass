@@ -1,0 +1,73 @@
+Stage 2 không được đánh giá trực tiếp trên video thật vì không có đồ thị ground truth cho các liên kết hành vi. Thay vào đó, đồ án dùng 100 bộ kiểm thử tổng hợp, mỗi bộ gồm một đồ thị có hướng thật và một chuỗi thời gian đa biến sinh từ đồ thị đó. Cách thiết kế này cho phép đo trực tiếp khả năng khôi phục cấu trúc cạnh của các phương pháp tìm kiếm đồ thị.
+
+Mỗi bộ kiểm thử gồm sáu biến hành vi: \textit{Talk}, \textit{Read}, \textit{Phone}, \textit{Write}, \textit{Lean} và \textit{Bow}. Đồ thị ground truth được sinh dưới ràng buộc bối cảnh lớp học: chỉ dùng sáu biến quan sát đã nêu, không thêm biến ẩn vào đồ thị, không tạo vòng phản hồi trong cấu trúc ground truth và tránh các quan hệ phi thực tế về mặt hành vi. Bộ sinh đồ thị nhận một ngữ cảnh ngẫu nhiên
+\begin{equation}
+\label{eq:synthetic-context}
+    c=(\tau,s,e),
+\end{equation}
+trong đó \(\tau\) là thời điểm trong ngày, \(s\) là loại hoạt động học tập và \(e\) là điều kiện lớp học. Các giá trị được lấy từ các tập hữu hạn như buổi sáng sớm, giữa buổi sáng, sau bữa trưa hoặc cuối buổi; bài giảng Toán, giờ đọc Lịch sử hoặc thảo luận tương tác; và các tình huống như sắp kiểm tra, giáo viên nghiêm khắc hoặc giáo viên quay lưng. Ngữ cảnh này chỉ dùng để đa dạng hóa đồ thị tổng hợp, không được xem là biến quan sát trong mô hình.
+
+Để giảm thiên lệch tự nhất quán trực tiếp, mô hình sinh đồ thị và mô hình tìm kiếm đồ thị được tách vai trò. Bộ sinh dùng Gemini 3.0 Flash để tạo đồ thị ground truth và lý do cho từng cạnh. Mô-đun tìm kiếm dùng DeepSeek-v4-Flash để đề xuất chỉnh sửa đồ thị, nhưng không được xem đồ thị ground truth. Cách tách này không loại bỏ hoàn toàn thiên lệch tiên nghiệm chung giữa các LLM, nhưng giúp tránh việc cùng một mô hình vừa tạo đáp án vừa tự khôi phục đáp án đó.
+
+Chuỗi thời gian được sinh bằng mô hình VAR(1):
+\begin{equation}
+\label{eq:var1-generation}
+    X_t = X_{t-1}W + \epsilon_t.
+\end{equation}
+Trong thiết lập này, trễ bậc một là xấp xỉ kỹ thuật trên các bin 4 giây, không phải khẳng định rằng hành vi lớp học chỉ phụ thuộc vào bin ngay trước đó. Ma trận trọng số được đặt theo đồ thị ground truth:
+\begin{equation}
+\label{eq:self-lag-weight}
+    W_{i,i}=0.5,
+\end{equation}
+\begin{equation}
+\label{eq:edge-weight-definition}
+    W_{i,j}=s_{i,j}\alpha_{i,j},\qquad (i\rightarrow j)\in E,
+\end{equation}
+trong đó \(s_{i,j}\in\{-1,+1\}\) là dấu của cạnh và \(\alpha_{i,j}\in\{0.15,0.30\}\) tương ứng với mức ảnh hưởng trung bình hoặc mạnh. Nhiễu được lấy không đồng nhất theo biến:
+\begin{equation}
+\label{eq:noise-distribution}
+    \epsilon_{t,k}\sim\mathcal{N}(0,\sigma_k^2),\qquad \sigma_k\sim U(0.5,2.5).
+\end{equation}
+Mỗi mô phỏng chạy 1,200 bước, bỏ 200 bước đầu làm burn-in và giữ lại 1,000 quan sát:
+\begin{equation}
+\label{eq:clipped-observations}
+    \widetilde{X}_{1:1000}=\mathrm{clip}(X_{201:1200}+50,0,100).
+\end{equation}
+Mỗi bộ kiểm thử lưu đồ thị thật, chuỗi thời gian nhiễu và ngữ cảnh đã lấy mẫu. Khi chạy tìm kiếm, chuỗi 1,000 quan sát được chia thành hai cửa sổ 500 mẫu để huấn luyện và kiểm chứng AERCA dưới các mask đồ thị khác nhau.
+
+Các chỉ số đánh giá Stage 2 được tính trên tập cạnh. Nếu ký hiệu tập cạnh dự đoán là \(\hat{E}\) và tập cạnh thật là \(E^{gt}\), ta có
+\begin{equation}
+\label{eq:graph-metrics}
+    P=\frac{|\hat{E}\cap E^{gt}|}{|\hat{E}|}, \qquad
+    R=\frac{|\hat{E}\cap E^{gt}|}{|E^{gt}|}, \qquad
+    F1=\frac{2PR}{P+R}.
+\end{equation}
+Trong trường hợp mẫu số bằng 0, chỉ số tương ứng được đặt bằng 0 để tránh tạo giá trị không xác định. Các chỉ số này chỉ áp dụng cho dữ liệu tổng hợp vì video thật không có đồ thị ground truth. Ngoài Precision, Recall và F1, hệ thống còn ghi lại MSE kiểm chứng, điểm BIC kiểu phạt cạnh và số cạnh trung bình để phân tích hành vi của quá trình chọn đồ thị.
+
+Thiết lập chạy Stage 2 được giữ cố định giữa các phương pháp so sánh. Bảng~\ref{tab:stage2-implementation-settings} tóm tắt các chi tiết triển khai được dùng cho benchmark tổng hợp và tìm kiếm đồ thị.
+
+\begin{table}[htbp]
+\centering
+\caption{Thiết lập triển khai Stage 2 trong benchmark tổng hợp.}
+\label{tab:stage2-implementation-settings}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{ll}
+\toprule
+\textbf{Thành phần} & \textbf{Thiết lập} \\
+\midrule
+AERCA dày ban đầu & 2 hidden layer, hidden size 64, window size 1, stride 1, 150 epoch, learning rate 0.005 \\
+Tóm tắt hệ số AERCA & Median trị tuyệt đối cho cấu trúc cạnh; mean có dấu cho trọng số và dấu cạnh \\
+Đồ thị khởi tạo & Ngưỡng quantile \(q=0.4\), loại self-loop khỏi đồ thị báo cáo \\
+Kiểm chứng ứng viên & Warm-start từ AERCA dày, fine-tune 15 epoch, learning rate 0.005 \\
+Chia train/validation & Chuỗi 1,000 quan sát được chia thành hai cửa sổ 500 mẫu để huấn luyện và kiểm chứng \\
+Bộ sinh đề xuất LLM & DeepSeek-v4-Flash đề xuất 1--3 thao tác thêm/xóa cạnh mỗi bước; không được xem ground truth \\
+Sinh ground truth tổng hợp & Gemini 3.0 Flash sinh DAG theo ngữ cảnh lớp học đã lấy mẫu \\
+Beam search & Beam width 5, tối đa 30 iteration, stale age tối đa 4, tabu set toàn cục \\
+Điểm số & \(\epsilon=10^{-8}\), ngưỡng cải thiện BIC tối thiểu cho add là \(-0.15\), \(\lambda_{syn}=65\) \\
+Log & JSON gồm baseline, đề xuất đã đánh giá, chỉnh sửa được nhận/loại, beam survivors và chỉ số cuối \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Mỗi bộ kiểm thử sinh log JSON chi tiết gồm chỉ số baseline, các đề xuất đã đánh giá, chỉnh sửa được chấp nhận hoặc bị loại, các đồ thị còn lại trong beam và chỉ số cuối cùng. Log này giúp phân biệt cải thiện thật do loại cạnh hợp lý với cải thiện giả do mất Recall quá mạnh.
