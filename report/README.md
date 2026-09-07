@@ -12,10 +12,14 @@ On Debian/Ubuntu:
 
 ```bash
 sudo apt-get update
-sudo apt-get install latexmk biber texlive-latex-extra texlive-science \
-  texlive-lang-other texlive-fonts-recommended
+sudo apt-get install --no-install-recommends latexmk biber texlive-latex-extra \
+  texlive-science texlive-lang-other texlive-fonts-recommended \
+  texlive-plain-generic texlive-bibtex-extra
 make report
 ```
+
+The explicit generic and bibliography collections supply glossary language
+tracking and BibLaTeX/IEEE styles even when APT recommendations are disabled.
 
 Or from this directory:
 
