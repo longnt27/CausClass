@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "Please cite CausClass and the original AERCA work when using this software. Record the exact commit and protocol version."
+type: software
+title: "CausClass: Temporal Classroom Behavior Graph Discovery"
+authors:
+  - family-names: "Nguyen"
+    given-names: "Trung Long"
+repository-code: "https://github.com/longnt27/CausClass"
+url: "https://github.com/longnt27/CausClass"
+version: "0.2.0"
+license: MIT
+keywords:
+  - temporal graphs
+  - classroom behavior
+  - reproducible research
+  - Granger causality

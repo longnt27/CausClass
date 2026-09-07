@@ -16,7 +16,7 @@ from utils.paths import DATA_DIR, ENV_FILE
 # ==========================================
 # CONFIGURATION & CONSTANTS
 # ==========================================
-load_dotenv(ENV_FILE, override=True)
+load_dotenv(ENV_FILE, override=False)
 GEMINI_MODEL = os.getenv("GEMINI_SYNTHETIC_MODEL", "gemini-3-flash-preview")
 
 BEHAVIORS = ['Talk', 'Read', 'Phone', 'Hand', 'Lean', 'Stand']

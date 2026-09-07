@@ -1,5 +1,42 @@
-.DS_Store
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+# Python/build/tool caches
+.venv/
 __pycache__/
 *.py[cod]
-.env
-output/saved_models/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+build/
+dist/
+# Generated research artifacts and local data (tracked originals are retained)
+output/
+wandb/
+runs/
+data/synth_data/
+data/cvat_dataset/
+*.pt
+*.pth
+.DS_Store
+# LaTeX intermediates; compiled report is an Actions artifact
+report/*.aux
+report/*.bbl
+report/*.bcf
+report/*.blg
+report/*.fdb_latexmk
+report/*.fls
+report/*.log
+report/*.lof
+report/*.lot
+report/*.out
+report/*.run.xml
+report/*.toc
+report/*.pdf
+
+# CI evidence is uploaded, not committed
+test-results.xml

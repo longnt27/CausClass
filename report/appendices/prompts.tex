@@ -1,0 +1,210 @@
+Phụ lục này trình bày các prompt được sử dụng trong hệ thống, bao gồm prompt sinh test, prompt đề xuất chỉnh sửa đồ thị và prompt sinh báo cáo quan sát.
+
+\section{Prompt sinh test}
+
+Prompt sinh test được dùng để yêu cầu mô hình ngôn ngữ tạo đồ thị nhân quả vĩ mô của lớp học dưới dạng DAG cho mô hình chuỗi thời gian VAR(1). Đầu ra mong muốn là một đối tượng JSON có khóa \texttt{edges}; mỗi cạnh gồm nguồn, đích, dấu tác động, độ mạnh và giải thích.
+
+\begin{lstlisting}[
+caption={Prompt sinh test đồ thị nhân quả vĩ mô trong lớp học.},
+label={lst:test-generation-prompt},
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+keepspaces=true,
+frame=single,
+showstringspaces=false
+]
+prompt = f"""You are an Expert Data Scientist modeling a MACROSCOPIC classroom causal graph (DAG) for a Time-Series VAR(1) model.
+Context: {context}
+
+AVAILABLE BEHAVIORS:
+- 'Talk': Widespread student-to-student chatting (Creates a noisy environment).
+- 'Read': A high percentage of the class focusing on reading textbooks.
+- 'Phone': Epidemic of covert smartphone usage.
+- 'Hand': Multiple students raising hands to ask questions.
+- 'Lean': Widespread slouching or leaning on desks.
+- 'Stand': Groups of students standing up.
+
+CRITICAL RULES FOR ALIGNMENT (YOUR GRAPH WILL BE REVIEWED BY A RUTHLESS PRUNER):
+1. BEHAVIORS MUST PHYSICALLY CAUSE BEHAVIORS. Do not invent butterfly-effect causality.
+   - ACCEPTABLE: "Widespread talking creates noise, reducing the percentage of students reading." (Talk -> Read, negative)
+   - ACCEPTABLE: "High phone usage isolates students, reducing peer-to-peer talking." (Phone -> Talk, negative)
+2. THINK IN PEER INFLUENCE & CONTAGION, NOT INDIVIDUAL SEQUENCES.
+3. Output MUST be a STRICT Directed Acyclic Graph (DAG). NO feedback loops.
+4. Output format: JSON object with a single key "edges" containing a list of edges.
+Each edge MUST have: "source", "target", "type" ('positive' or 'negative'), "strength" ('medium', 'high' ONLY), and "reasoning".
+
+Generate EXACTLY {min_edges} to {max_edges} bulletproof, highly logical MACRO-LEVEL causal edges that represent DIRECT PHYSICAL/ENVIRONMENTAL INFLUENCE.
+"""
+\end{lstlisting}
+
+\section{Các biến đầu vào của prompt sinh test}
+
+Ba biến được chèn vào prompt bằng cơ chế f-string của Python:
+\begin{itemize}
+\item \texttt{context}: mô tả ngữ cảnh lớp học cho từng lần sinh test. Biến này giúp mỗi đồ thị được tạo gắn với một tình huống cụ thể, ví dụ thời điểm trong ngày, dạng bài học và sự kiện đang diễn ra trong lớp.
+\item \texttt{min\_edges}: số cạnh tối thiểu mà mô hình cần sinh. Tham số này kiểm soát cận dưới về độ dày của đồ thị kiểm thử.
+\item \texttt{max\_edges}: số cạnh tối đa mà mô hình được phép sinh. Tham số này kiểm soát cận trên về độ dày của đồ thị, tránh việc mô hình thêm quá nhiều liên kết khó kiểm chứng.
+\end{itemize}
+
+Trong triển khai, biến \texttt{context} được sinh động bằng cách lấy ngẫu nhiên một thời điểm, một loại bài học và một sự kiện lớp học:
+
+\begin{lstlisting}[
+caption={Hàm sinh ngữ cảnh động cho prompt sinh test.},
+label={lst:dynamic-context-generator},
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+keepspaces=true,
+frame=single,
+showstringspaces=false
+]
+def generate_dynamic_context():
+    times = ["early morning", "mid-morning", "post-lunch food coma", "late afternoon"]
+    subjects = ["Calculus lecture", "boring History reading", "interactive discussion"]
+    events = ["stressful exam coming up", "teacher is strict", "teacher has back turned"]
+    return f"Time: {random.choice(times)}. Subject: {random.choice(subjects)}. Event: {random.choice(events)}."
+\end{lstlisting}
+
+Do đó, mỗi lời gọi hàm có thể tạo một ngữ cảnh khác nhau, chẳng hạn lớp học buổi sáng sớm, tiết đọc lịch sử nhàm chán hoặc tình huống giáo viên quay lưng. Ngữ cảnh này không trực tiếp quyết định cạnh nào phải xuất hiện, nhưng định hướng mô hình chọn các quan hệ phù hợp hơn với điều kiện quan sát.
+
+\section{Prompt đề xuất chỉnh sửa đồ thị}
+
+Prompt đề xuất chỉnh sửa đồ thị được dùng cho tác nhân \textit{Pruning Agent} trong CausClass. Nhiệm vụ của tác nhân là nhận đồ thị hiện tại từ quy trình tìm kiếm, xem các tín hiệu liên kết còn thiếu và đề xuất một số thao tác \texttt{add} hoặc \texttt{delete} để làm sạch đồ thị. Prompt được tách thành hai phần nhằm tối ưu hóa prompt cache: phần \texttt{system\_prompt} chứa các định nghĩa và luật cố định, còn phần \texttt{user\_prompt} chứa trạng thái động của từng bước tìm kiếm.
+
+Các quy tắc trong system prompt được hình thành từ hai nguồn. Một phần đến từ gợi ý của mô hình ngôn ngữ về cách ràng buộc bài toán ở mức vĩ mô. Phần còn lại đến từ quá trình prompt engineering: quan sát các đầu ra sai hoặc yếu của mô hình, nhận diện các kiểu lỗi lặp lại, rồi thêm quy tắc để ngăn chặn. Vì vậy, một số quy tắc có thể trông không trực giác ngay từ đầu, nhưng được dùng để chặn các lỗi cụ thể như xóa cạnh chỉ vì quan hệ có dấu âm, quy mọi hành vi về trạng thái ẩn, hoặc thêm cạnh ngoài tập nút cho phép.
+
+\subsection{System prompt cố định}
+
+\begin{lstlisting}[
+caption={System prompt cho tác nhân đề xuất chỉnh sửa đồ thị.},
+label={lst:graph-edit-system-prompt},
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+keepspaces=true,
+frame=single,
+showstringspaces=false
+]
+system_prompt = f"""PROJECT CONTEXT: You are the core 'Pruning Agent' for "CausClass", a system designed to discover macro-level classroom behavior graphs from noisy Time-Series data. The baseline mathematical engine (AERCA) has extracted a messy graph full of spurious correlations. YOUR JOB IS TO CLEAN IT UP.
+
+CRITICAL MACRO-LEVEL DEFINITIONS (MUST USE THESE):
+- 'Talk': Widespread student-to-student chatting (Contagious noise).
+- 'Read': A high percentage of the class focusing on reading.
+- 'Phone': Epidemic of covert smartphone usage (Signals contagious isolation).
+- 'Hand': Multiple students raising hands (High collective engagement).
+- 'Lean': Widespread slouching/leaning (Contagious fatigue/low energy).
+- 'Stand': Groups of students standing up.
+
+CRITICAL CAUSALITY RULES (READ CAREFULLY BEFORE DELETING):
+1. STRUCTURAL GRAPH ONLY: The edges provided to you represent STRUCTURAL CONNECTIONS ONLY. They DO NOT imply a positive or negative sign.
+2. NEGATIVE CAUSALITY IS VALID: If A suppresses/decreases B (e.g., Talking suppresses Reading), the structural link EXISTS and is VALID. 
+3. DO NOT BE THE SIGN POLICE: NEVER propose deleting an edge by arguing "it suppresses B, so the positive sign is wrong". If A impacts B in ANY WAY (increasing OR suppressing), YOU MUST KEEP THE EDGE. DO NOT DELETE IT!
+
+CRITICAL PRUNING AND ADDING RULES:
+1. BEHAVIORS CAUSE BEHAVIORS (NO LATENT STATES): You MUST assume that behaviors directly influence other behaviors through peer contagion or physical disruption. NEVER delete an edge by arguing that both behaviors are just "symptoms" of a hidden internal state (like 'boredom', 'engagement', 'fatigue', 'energy', or 'motivation'). 
+2. NEGATIVE CAUSALITY = KEEP: If behavior A creates an environment that suppresses behavior B (e.g., Talking creates noise that stops Reading; Phone use isolates students and stops Talking), YOU MUST KEEP THE EDGE. 
+3. DELETE ONLY ABSURD PHYSICAL SEQUENCES: Only delete an edge if the physical sequence is absurd (e.g., Reading causes Standing, or Standing causes Leaning). 
+4. NO HALLUCINATIONS: Evaluate ONLY the nodes provided. Do not invent root causes.
+5. THE 'ADD' ACTION (RESURRECTION): You will be provided with 'SUSPECTED MISSING LINKS' (strong mathematical signals ignored by the baseline). If one of these missing links makes PERFECT MACRO-LOGICAL SENSE (e.g., Talk suppresses Read, Phone suppresses Talk), output an 'add' action! Do not add blindly, only add if the behavior clearly drives or suppresses the target.
+
+OUTPUT FORMAT: Return ONLY a valid JSON object containing an "edits" key mapped to an array of 1 to 3 objects.
+EXAMPLE:
+{{
+  "edits": [
+    {{"action": "delete", "source": "Read", "target": "Stand", "reasoning": "Reading is stationary, it does not physically cause standing."}},
+    {{"action": "add", "source": "Talk", "target": "Read", "reasoning": "Widespread talking creates a disruptive noise environment that heavily suppresses reading."}}
+  ]
+}}
+
+"""
+\end{lstlisting}
+
+\subsection{User prompt động}
+
+\begin{lstlisting}[
+caption={User prompt chứa trạng thái động của bước tối ưu đồ thị.},
+label={lst:graph-edit-user-prompt},
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+keepspaces=true,
+frame=single,
+showstringspaces=false
+]
+user_prompt = f"""
+=== CURRENT GRAPH TO OPTIMIZE ===
+{self.format_current_graph(current_edges)}
+
+=== SUSPECTED MISSING LINKS (MATH SIGNALS) ===
+{hint_str}
+
+TABU LIST (DO NOT SUGGEST THESE EDGES): {json.dumps(local_tabu)}
+SYSTEM FEEDBACK (Prior MSE impacts): {feedback_momentum}
+
+TASK: Return a JSON object with the "edits" array containing 1 to 3 strictly evaluated edits.
+"""
+\end{lstlisting}
+
+\subsection{Các biến đầu vào của prompt chỉnh sửa đồ thị}
+
+Các biến trong phần động phản ánh trạng thái hiện tại của vòng tìm kiếm:
+\begin{itemize}
+\item \texttt{current\_edges}: danh sách cạnh hiện có của đồ thị đang được tối ưu. Đây là đối tượng mà mô hình cần xem xét để đề xuất xóa cạnh không hợp lý hoặc giữ lại các liên kết có cơ sở vĩ mô.
+\item Hàm \texttt{format\_current\_graph}: chuyển \texttt{current\_edges} thành chuỗi văn bản dễ đọc cho mô hình, thường gồm các cặp nguồn--đích đang có trong đồ thị.
+\item \texttt{hint\_str}: chuỗi mô tả các liên kết nghi ngờ bị thiếu. Các liên kết này đến từ tín hiệu toán học nhưng chưa có trong đồ thị hiện tại, nên chỉ nên được thêm nếu có diễn giải hành vi vĩ mô hợp lý.
+\item \texttt{local\_tabu}: danh sách cấm cục bộ trong bước tìm kiếm hiện tại. Các cạnh trong danh sách này không được đề xuất lại, nhằm tránh lặp vòng, tránh các chỉnh sửa vừa bị bác bỏ hoặc các cạnh đã biết là không nên thử.
+\item Lời gọi \texttt{json.dumps}: tuần tự hóa danh sách \texttt{local\_tabu} thành chuỗi JSON để đưa vào prompt một cách rõ ràng và ít mơ hồ.
+\item \texttt{feedback\_momentum}: tóm tắt phản hồi từ các lần thử trước, đặc biệt là tác động của các chỉnh sửa lên MSE. Biến này giúp mô hình ưu tiên các hướng chỉnh sửa từng cải thiện tiêu chí đánh giá và tránh các hướng từng làm kết quả xấu đi.
+\end{itemize}
+
+Nhờ cách tách này, phần định nghĩa hành vi và luật kiểm soát đầu ra có thể được tái sử dụng qua nhiều lượt gọi, trong khi chỉ phần trạng thái đồ thị, tín hiệu thiếu cạnh, danh sách tabu và phản hồi định lượng thay đổi theo từng vòng tối ưu.
+
+\section{Prompt sinh báo cáo quan sát}
+
+Prompt sinh báo cáo quan sát được dùng ở bước cuối của hệ thống để chuyển dữ liệu phát hiện hành vi và đồ thị đã kiểm chứng thành báo cáo ngắn gọn, nêu bằng chứng trước. Prompt này nhấn mạnh rằng hệ thống không có ngữ cảnh bài học, tỉ lệ hành vi là tỉ lệ sự kiện phát hiện theo bin thời gian, và các cạnh đồ thị chỉ là liên kết thời gian chứ không phải bằng chứng nhân quả.
+
+\begin{lstlisting}[
+caption={Prompt sinh báo cáo quan sát từ dữ liệu phát hiện hành vi.},
+label={lst:observation-report-prompt},
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+keepspaces=true,
+frame=single,
+showstringspaces=false
+]
+You are a classroom observation analyst. Produce a compact evidence-first report from behavior-detection data.
+
+Hard limits:
+- No lesson context is available.
+- Behavior shares are detected-event shares per time bin, not student percentages.
+- Graph edges are temporal associations, not proof of causality.
+- Respect the graph exactly. Do not ignore, rename, reverse, merge, or invent graph edges.
+- Graph direction matters: A -> B means A at an earlier step is associated with B later. Do not infer B -> A unless that edge exists.
+- Use every final graph edge when forming interpretations; if an edge is weak, explicitly call it weak instead of omitting it.
+- Do not mention any time window, timestamp, or phase boundary unless it is explicitly present in time_series_summary.
+- Do not claim an arbitrary early slice is a meaningful lesson phase.
+- Do not judge students or claim off-task behavior.
+- Do not recommend punishment, phone bans, phone stacks, phone parking, shaming, or policy changes.
+- Keep teacher-facing wording simple; this report is for classroom review, not a research paper.
+- Section 1 must not contain graph-derived claims; save all graph reasoning for possible_interpretations.
+- No markdown. Return JSON only.
+
+Return exactly one valid JSON object with these keys:
+{
+  "what_happened": [2 to 4 short bullets containing ONLY descriptive detection facts: frequent/rare behaviors, active bins, mean shares; DO NOT mention graph edges, causality, associations, trade-offs, or interpretations],
+  "changed_over_time": [2 to 4 short bullets based ONLY on trend_by_behavior and temporal_segments; explicitly treat early/middle/late as equal video thirds, not lesson phases],
+  "possible_interpretations": [2 to 3 bullets, each with evidence + alternate explanation; use the graph here, respect direction, and mention weak edges as weak],
+  "human_inspection": [3 to 5 specific debug-frame checks],
+}
+
+Section rules:
+- Section 1 / what_happened must be pure observation. Do not mention Phone -> Read, Talk -> Read, negative edge, positive edge, association, trade-off, or causal language there.
+- Section 2 / changed_over_time may compare equal video thirds and trend directions, but must not imply those thirds are lesson phases.
+- Section 3 will be rendered exactly by the program from the verified graph. Do NOT include a graph_edges_found key.
+- Section 4 / possible_interpretations may interpret graph edges, but must not reverse edge direction. A -> B does not mean B -> A.
+- Each bullet must be one sentence. Keep the whole report readable, but do not omit required sections just to be short.
+\end{lstlisting}
+
+Các trường đầu vào chính mà prompt dựa vào gồm \texttt{time\_series\_summary}, \texttt{trend\_by\_behavior}, \texttt{temporal\_segments} và đồ thị cuối cùng đã được kiểm chứng. Trong đó, \texttt{time\_series\_summary} cung cấp thống kê mô tả theo thời gian, \texttt{trend\_by\_behavior} mô tả xu hướng của từng hành vi, \texttt{temporal\_segments} mô tả các phần bằng nhau của video, còn đồ thị cuối cùng cung cấp các liên kết thời gian được phép dùng trong phần diễn giải.

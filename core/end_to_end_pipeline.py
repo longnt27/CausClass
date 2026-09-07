@@ -1050,7 +1050,7 @@ def save_graph_artifacts(
     txt_path = output_dir / f"{stem}_final_graph_readable.txt"
     png_path = output_dir / f"{stem}_final_graph.png"
 
-    pd.DataFrame(edge_rows).sort_values(by="weight", key=lambda s: s.abs(), ascending=False).to_csv(edge_csv, index=False)
+    pd.DataFrame(edge_rows, columns=["source", "target", "weight", "sign"]).sort_values(by="weight", key=lambda s: s.abs(), ascending=False).to_csv(edge_csv, index=False)
     adj.to_csv(adj_csv)
     txt_path.write_text(format_graph_snapshot(graph), encoding="utf-8")
 

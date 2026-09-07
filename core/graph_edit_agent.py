@@ -7,15 +7,29 @@ backoff retry mechanism to handle API rate limits (e.g., HTTP 429).
 """
 
 import json
+import os
 import requests
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+
+
+def _is_transient(exc):
+    if isinstance(exc, (requests.Timeout, requests.ConnectionError)):
+        return True
+    return (isinstance(exc, requests.HTTPError) and exc.response is not None
+            and (exc.response.status_code == 429 or 500 <= exc.response.status_code < 600))
 
 class LLMGraphAgent:
     """
     LLM-based optimization agent that interacts with the causal discovery pipeline.
     Utilizes context, raw structural priors, and tabular history to propose valid DAG edits.
     """
-    def __init__(self, api_key, variables, context):
+    def __init__(self, api_key, variables, context, *, model=None, timeout=(10, 90)):
+        if not api_key or not str(api_key).strip():
+            raise ValueError("DEEPSEEK_API_KEY is required for LLM proposals")
+        if len(set(variables)) != len(variables):
+            raise ValueError("variable names must be unique")
+        self.model = model or os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+        self.timeout = timeout
         self.api_key = api_key
         self.api_url = "https://api.deepseek.com/chat/completions"
         self.variables = variables 
@@ -38,7 +52,7 @@ class LLMGraphAgent:
     @retry(
         stop=stop_after_attempt(5), 
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type(requests.exceptions.HTTPError),
+        retry=retry_if_exception(_is_transient),
         reraise=True
     )
     def _call_llm_api(self, payload):
@@ -49,7 +63,8 @@ class LLMGraphAgent:
         res = requests.post(
             self.api_url, 
             json=payload,
-            headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+            headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+            timeout=self.timeout,
         )
         res.raise_for_status() 
         return res.json()
@@ -125,7 +140,7 @@ TASK: Return a JSON object with the "edits" array containing 1 to 3 strictly eva
 """
         
         payload = {
-            "model": "deepseek-chat", 
+            "model": self.model, 
             "temperature": 0.1, 
             "response_format": {"type": "json_object"},
             "messages": [
@@ -139,15 +154,30 @@ TASK: Return a JSON object with the "edits" array containing 1 to 3 strictly eva
             content = response_data['choices'][0]['message']['content'].strip()
             
             parsed_data = json.loads(content)
-            raw_edits = parsed_data.get("edits", [])
+            if not isinstance(parsed_data, dict) or not isinstance(parsed_data.get("edits"), list):
+                return []
+            raw_edits = parsed_data["edits"]
             
             final_edits = []
+            seen = set()
+            current_pairs = {(e["source"], e["target"]) for e in current_edges}
             for edit in raw_edits:
+                if not isinstance(edit, dict):
+                    continue
                 s = edit.get("source")
                 t = edit.get("target")
                 
                 # Hallucination Guardrail[cite: 2]
-                if s in self.variables and t in self.variables:
+                action = edit.get("action")
+                if (not isinstance(s, str) or not isinstance(t, str)
+                        or not isinstance(action, str)):
+                    continue
+                key = (action, s, t)
+                if (s in self.variables and t in self.variables and s != t
+                        and action in {"add", "delete"} and key not in seen
+                        and ((action == "add" and (s, t) not in current_pairs)
+                             or (action == "delete" and (s, t) in current_pairs))):
+                    seen.add(key)
                     final_edits.append(edit)
                 else:
                     print(f"  [Security Guard] Trashed hallucinated edit: {s} -> {t}")

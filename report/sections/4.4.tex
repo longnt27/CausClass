@@ -1,0 +1,35 @@
+Nghiên cứu cắt lớp Stage 2 đánh giá các cấu hình tìm kiếm đồ thị trên 100 bộ kiểm thử VAR(1) tổng hợp đã mô tả ở Mục 4.3. Mỗi phương pháp trả về một đồ thị dự đoán \(\hat{G}\), sau đó so sánh với đồ thị thật \(G^{gt}\) để tính Precision, Recall và F1. Mục tiêu chính là đo khả năng khôi phục cấu trúc cạnh, trong khi BIC, MSE và số cạnh trung bình được dùng như tín hiệu chẩn đoán quá trình chọn đồ thị.
+
+Các cấu hình so sánh được chia thành ba nhóm. Nhóm thứ nhất là AERCA khởi tạo với ngưỡng \(q=0.4\), lấy trực tiếp đồ thị từ ma trận khám phá của AERCA mà không có bước tìm kiếm chỉnh sửa. Đây cũng là đồ thị ban đầu được dùng làm điểm xuất phát cho ba phương pháp tìm kiếm ở nhóm cuối: Random Beam, LLM Greedy và LLM Beam. Vì vậy, dòng AERCA-init không chỉ là một baseline độc lập, mà còn cho biết cấu trúc đồ thị trước khi có can thiệp của cơ chế tìm kiếm trông như thế nào. Nhóm thứ hai là các biến thể AERCA làm thưa bằng ngưỡng quantile \(q\). Trong đó, AERCA-best chọn ngưỡng có F1 trung bình cao nhất trong sweep \(q\in\{0.05,0.10,\ldots,0.95\}\), còn AERCA-strict chọn ngưỡng có số cạnh trung bình gần nhất với LLM Beam. Nhóm thứ ba đánh giá cơ chế tìm kiếm: Random Beam dùng cùng beam search nhưng sinh chỉnh sửa ngẫu nhiên; LLM Greedy dùng đề xuất từ LLM nhưng chỉ giữ một ứng viên; LLM Beam là cấu hình đề xuất, kết hợp đề xuất chỉnh sửa từ LLM, kiểm chứng bằng AERCA có mask và duy trì nhiều ứng viên trong beam.
+
+\begin{table}[htbp]
+\centering
+\caption{Nghiên cứu cắt lớp Stage 2 trên 100 bộ VAR(1) tổng hợp.}
+\label{tab:graph-search-slice-study}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrrrr}
+\toprule
+\textbf{Phương pháp} & \textbf{F1} & \textbf{Std. F1} & \textbf{Precision} & \textbf{Recall} & \textbf{BIC} & \textbf{MSE} & \textbf{Số cạnh} \\
+\midrule
+AERCA-init, \(q=0.4\) & 0.2233 & 0.0317 & 0.1264 & \textbf{0.9700} & 6503.5925 & 0.0091 & 22.00 \\
+AERCA-best, \(q=0.85\) & 0.3306 & 0.1499 & 0.2450 & 0.5133 & 156.8964 & 0.0121 & 6.00 \\
+AERCA-strict, \(q=0.90\) & 0.3133 & 0.1922 & 0.2700 & 0.3767 & -531.3597 & 0.0156 & 4.00 \\
+Random Beam & 0.0740 & 0.1630 & 0.0808 & 0.0733 & \textbf{-2135.0598} & 0.0053 & 1.47 \\
+LLM Greedy & 0.4160 & 0.1557 & 0.3074 & 0.8600 & 1409.2882 & \textbf{0.0042} & 10.57 \\
+\textbf{LLM Beam (proposed)} & \textbf{0.5043} & 0.2054 & \textbf{0.4952} & 0.5950 & -1088.8058 & 0.0071 & 3.82 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Kết quả cho thấy đồ thị AERCA-init tại \(q=0.4\) đạt Recall cao nhất, 0.9700, nhưng Precision chỉ 0.1264 vì dự đoán trung bình 22.00 cạnh. Điều này nghĩa là đồ thị khởi tạo đã thu hồi được nhiều cạnh thật, nhưng đồng thời chứa nhiều cạnh thừa trước khi có bất kỳ thao tác tìm kiếm nào. Vì vậy, dòng AERCA-init là mốc quan trọng để đọc ba phương pháp cuối: Random Beam, LLM Greedy và LLM Beam đều bắt đầu từ một đồ thị dày, thiên về Recall cao, sau đó cố gắng loại bỏ hoặc điều chỉnh cạnh để tăng Precision và F1.
+
+Hai biến thể AERCA làm thưa cung cấp so sánh công bằng hơn. AERCA-best đạt F1 0.3306 với Precision 0.2450, Recall 0.5133 và 6.00 cạnh trung bình; đây là kết quả tốt nhất của sweep ngưỡng đơn giản. AERCA-strict dùng \(q=0.90\), tạo 4.00 cạnh trung bình, gần với 3.82 cạnh của LLM Beam, nhưng F1 chỉ đạt 0.3133. Như vậy, chỉ làm thưa đồ thị AERCA chưa đủ để đạt hiệu năng của phương pháp đề xuất.
+
+Random Beam có F1 thấp nhất, 0.0740, cho thấy beam search tự thân không tạo ra lợi ích nếu đề xuất chỉnh sửa không có định hướng. LLM Greedy cải thiện rõ rệt so với AERCA-best và Random Beam, đạt F1 0.4160, nhưng giữ trung bình 10.57 cạnh và có Precision thấp hơn LLM Beam. Điều này cho thấy đề xuất từ LLM là hữu ích, nhưng chiến lược greedy dễ giữ lại các cạnh hấp dẫn cục bộ hoặc không cần thiết.
+
+LLM Beam đạt F1 cao nhất, 0.5043, và Precision cao nhất, 0.4952, trong khi chỉ tạo 3.82 cạnh trung bình. So với AERCA-best, LLM Beam tăng F1 thêm 0.1737 và Precision thêm 0.2502. So với AERCA-strict, vốn có mật độ cạnh gần tương đương, LLM Beam tăng F1 thêm 0.1910 và Precision thêm 0.2252. Do đó, lợi ích của LLM Beam không chỉ đến từ việc tạo đồ thị thưa hơn, mà đến từ kết hợp ba yếu tố: LLM đề xuất chỉnh sửa có tính ngữ nghĩa, AERCA kiểm chứng từng đồ thị bằng dữ liệu dưới mask tương ứng, và beam search duy trì nhiều ứng viên hợp lý trước khi chọn cấu trúc cuối.
+
+BIC và MSE cần được diễn giải như tín hiệu chẩn đoán, không phải thước đo trực tiếp của đồ thị đúng. Random Beam có BIC thấp nhất nhờ kết hợp MSE thấp với số cạnh rất nhỏ, nhưng F1 cấu trúc lại kém vì nhiều cạnh thật bị loại bỏ. LLM Greedy có MSE thấp nhất nhưng không đạt F1 tốt nhất, cho thấy dự báo tốt hơn không nhất thiết đồng nghĩa với khôi phục đúng cạnh hơn. Vì vậy, trong benchmark tổng hợp có ground truth, tiêu chí chính vẫn là Precision, Recall và F1 của cấu trúc cạnh.
+
+Trong mỗi bộ kiểm thử tổng hợp, sai số khôi phục có thể chia thành ba loại: cạnh đúng \(TP_E=|\hat{E}\cap E^{gt}|\), cạnh thừa \(FP_E=|\hat{E}\setminus E^{gt}|\), và cạnh thiếu \(FN_E=|E^{gt}\setminus \hat{E}|\). Một phương pháp tốt cần giảm đồng thời \(FP_E\) và \(FN_E\). F1 cao của LLM Beam cho thấy phương pháp này đạt cân bằng tốt hơn giữa việc thêm cạnh cần thiết và loại bỏ cạnh không được dữ liệu ủng hộ. Tuy nhiên, kết quả này chỉ chứng minh khả năng khôi phục cấu trúc trong dữ liệu tổng hợp có ground truth; với video lớp học thật, đồ thị vẫn phải được xem là liên kết thời gian quan sát được, không phải bằng chứng nhân quả thực nghiệm.

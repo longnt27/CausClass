@@ -1,0 +1,29 @@
+Chương 1 đã xác định bài toán của đồ án là chuyển video lớp học thành bằng chứng hành vi có cấu trúc, từ đó hỗ trợ phân tích các liên kết dự báo theo thời gian. Để làm rõ ngữ cảnh của bài toán, cần phân biệt ba lớp thông tin: dữ liệu quan sát, dữ liệu mô hình hóa và diễn giải giáo dục. Video lớp học thuộc lớp dữ liệu quan sát; nó ghi lại những tín hiệu có thể nhìn thấy như tư thế, cử chỉ, hành động với sách vở hoặc thiết bị. Các tín hiệu này có giá trị phân tích, nhưng không trực tiếp chứa đầy đủ ý định, động cơ hoặc trạng thái học tập bên trong của học sinh.
+
+Trong quan sát lớp học truyền thống, người quan sát thường dùng một bộ mã hành vi để ghi nhận các sự kiện theo thời gian. Cách tiếp cận này tạo ra dữ liệu có cấu trúc và có thể phục vụ nghiên cứu giáo dục, nhưng yêu cầu người quan sát hiểu tiêu chí mã hóa, theo dõi diễn biến trong lớp và đưa ra quyết định nhất quán. Khi chuyển sang quan sát bằng video, ưu điểm là người dùng có thể xem lại nhiều lần và kiểm tra bằng chứng trực quan; hạn chế là lượng dữ liệu lớn và việc gán nhãn thủ công trở nên tốn kém.
+
+Trong bối cảnh của đồ án, dữ liệu video được xem như nguồn tạo ra các sự kiện hành vi quan sát được. Nếu ký hiệu video đầu vào là \(V = \{I_1, I_2, \ldots, I_N\}\), với \(I_i\) là khung hình thứ \(i\), mục tiêu ban đầu không phải suy luận trực tiếp một trạng thái ẩn của học sinh, mà là ước lượng tập sự kiện
+\begin{equation}
+\label{eq:observed-event-set}
+    \mathcal{E} = \{(u,b,t_a,t_b,\bar{s})\},
+\end{equation}
+trong đó \(u\) là định danh theo dõi, \(b\) là nhãn hành vi, \([t_a,t_b]\) là khoảng thời gian sự kiện được ghi nhận và \(\bar{s}\) là độ tin cậy trung bình. Một sự kiện như vậy chỉ là bằng chứng quan sát do hệ thống phát hiện, không phải kết luận sư phạm hoàn chỉnh.
+
+Sau khi có các sự kiện, bài toán chuyển sang lớp dữ liệu mô hình hóa. Các sự kiện được gom theo những khoảng thời gian cố định để tạo chuỗi thời gian đa biến. Nếu xét \(K\) hành vi trong \(T\) time bin, chuỗi hành vi có thể biểu diễn bởi
+\begin{equation}
+\label{eq:behavior-time-series}
+    X \in \mathbb{R}^{T \times K},
+\end{equation}
+trong đó mỗi hàng tương ứng với một khoảng thời gian và mỗi cột tương ứng với một hành vi. Giá trị \(X_{t,k}\) biểu diễn tỉ lệ hoặc cường độ tương đối của hành vi \(k\) trong bin \(t\), được tính từ đầu ra của bộ phát hiện. Cách biểu diễn này tạo cầu nối giữa video và các phương pháp phân tích chuỗi thời gian.
+
+Lớp thông tin cuối cùng là diễn giải. Khi một mô hình phát hiện liên kết \(i\rightarrow j\), đồ án diễn giải cạnh này như một dấu hiệu rằng lịch sử của hành vi \(i\) có ích cho dự báo hành vi \(j\) trong cấu hình mô hình đã kiểm chứng. Cạnh này không tự động chứng minh rằng \(i\) gây ra \(j\), vì video lớp học là dữ liệu quan sát thụ động và còn nhiều biến nền không được đo, chẳng hạn hoạt động của giáo viên, nội dung bài học, âm thanh hoặc tương tác ngoài vùng nhìn của camera. Vì vậy, ngữ cảnh phù hợp của bài toán là phân tích liên kết dự báo có kiểm chứng, không phải khẳng định nhân quả chắc chắn.
+
+Toàn bộ quy trình có thể mô tả bằng ánh xạ nhiều bước:
+\begin{equation}
+\label{eq:pipeline-mapping}
+    f_{det}: V \rightarrow \mathcal{E}, \qquad
+    f_{agg}: \mathcal{E} \rightarrow X, \qquad
+    f_{graph}: X \rightarrow G, \qquad
+    h_{rep}: (X,G) \rightarrow R.
+\end{equation}
+Trong đó \(f_{det}\) là mô-đun phát hiện--theo dõi, \(f_{agg}\) là mô-đun gom sự kiện thành chuỗi thời gian, \(f_{graph}\) là mô-đun tìm kiếm đồ thị và \(h_{rep}\) là bước tạo báo cáo quan sát. Ngữ cảnh này cho thấy thách thức chính của đồ án nằm ở tính liên thông giữa các bước: nếu phát hiện ban đầu nhiễu, chuỗi thời gian sẽ lệch; nếu đồ thị quá dày, báo cáo sẽ khó kiểm tra; nếu báo cáo không bị ràng buộc bởi bằng chứng, diễn giải có thể vượt ra ngoài những gì video hỗ trợ.

@@ -1,0 +1,74 @@
+Gọi \(\mathcal{B}\) là tập biến hành vi trong đồ thị, \(K=|\mathcal{B}|\), và \(X\in\mathbb{R}^{T\times K}\) là chuỗi thời gian đa biến trên các biến này. AERCA ban đầu là một phương pháp encoder--decoder cho khám phá Granger và phân tích nguyên nhân gốc trong chuỗi thời gian đa biến \,\cite{han2025aerca}. Encoder ước lượng các thành phần ngoại sinh, còn decoder tái tạo quan sát từ lịch sử quan sát và biến ngoại sinh dưới một cấu trúc phụ thuộc học được. Trong CausClass, AERCA không được dùng chủ yếu cho định vị bất thường; nó được điều chỉnh thành một mô-đun trích xuất và kiểm chứng đồ thị.
+
+Ở bước baseline, một mô hình AERCA dày được huấn luyện trên chuỗi hành vi. Từ mô hình đã học, pipeline trích xuất tensor hệ số thời gian và tóm tắt thành hai ma trận: ma trận hệ số median theo trị tuyệt đối để phát hiện cấu trúc cạnh, và ma trận hệ số mean có dấu để xác định dấu/trọng số của cạnh. Self-loop được loại khỏi đồ thị báo cáo ban đầu, nhưng lịch sử tự thân của mỗi biến vẫn được phép sử dụng bên trong mô hình khi kiểm chứng có mask. Cấu hình huấn luyện cụ thể của AERCA được trình bày trong Chương 4.
+
+Đồ thị baseline được lấy bằng cách ngưỡng hóa ma trận cấu trúc thô theo quantile \(q\). Nếu ký hiệu ma trận độ mạnh liên kết là \(W\in\mathbb{R}^{K\times K}\) và \(\tau_q\) là ngưỡng quantile mức \(q\) của các phần tử ngoài đường chéo trong \(W\), đồ thị khởi tạo có ma trận kề
+\begin{equation}
+\label{eq:aerca-initial-adjacency}
+    A^{(0)}_{ij}=\mathbf{1}\{W_{ij}\geq \tau_q\}, \qquad A^{(0)}_{ii}=0.
+\end{equation}
+Mỗi cạnh được giữ lại nhận dấu và trọng số từ ma trận hệ số có dấu. Đồ thị này đóng vai trò điểm xuất phát cho tìm kiếm, không phải kết quả cuối cùng bắt buộc. Giá trị ngưỡng được dùng trong từng thí nghiệm được nêu ở Chương 4.
+
+Để kiểm chứng một đồ thị ứng viên \(G=(\mathcal{B},E)\) trên cùng tập biến hành vi, pipeline xây dựng mask nhị phân
+\begin{equation}
+\label{eq:graph-mask-space}
+    M_G\in\{0,1\}^{K\times K},
+\end{equation}
+trong đó kích thước \(K\times K\) xuất phát từ \(K=|\mathcal{B}|\): mỗi hàng và mỗi cột tương ứng với một biến hành vi trong \(\mathcal{B}\). Cụ thể,
+\begin{equation}
+\label{eq:graph-mask-definition}
+    (M_G)_{ij}=\begin{cases}
+        1, & \text{nếu } (i,j)\in E,\\
+        0, & \text{nếu } (i,j)\notin E.
+    \end{cases}
+\end{equation}
+Đường chéo được đặt bằng 1,
+\begin{equation}
+\label{eq:self-connection-mask}
+    (M_G)_{ii}=1,
+\end{equation}
+để mỗi biến vẫn được phép dùng lịch sử của chính nó trong dự báo. Mask không biểu diễn trọng số cạnh; nó chỉ biểu diễn ràng buộc cấu trúc: cạnh nào được phép ảnh hưởng tới dự báo và cạnh nào bị chặn.
+
+Gọi \(\Theta\) là tập tham số của AERCA và \(C_\Theta(X)\in\mathbb{R}^{K\times K}\) là ma trận hệ số liên kết mà mô hình sử dụng sau khi thu gọn các chiều phụ. Khi áp mask của đồ thị ứng viên, hệ số hiệu dụng là
+\begin{equation}
+\label{eq:masked-causal-score}
+    \widetilde{C}_{\Theta,G}(X)=C_\Theta(X)\odot M_G,
+\end{equation}
+trong đó \(\odot\) là phép nhân từng phần tử. Nếu \((M_G)_{ij}=0\), liên kết từ biến \(i\) sang biến \(j\) bị triệt tiêu trong mô hình dự báo; nếu \((M_G)_{ij}=1\), liên kết đó được phép tham gia dự báo và được tối ưu cùng các tham số còn lại.
+
+Với mask \(M_G\), bài toán huấn luyện AERCA cho đồ thị ứng viên được viết tổng quát là
+\begin{equation}
+\label{eq:masked-aerca-objective}
+    \Theta_G^{\star}=\arg\min_{\Theta}\;\mathcal{L}_{AERCA}(X;\Theta,M_G).
+\end{equation}
+Hai đồ thị khác nhau tương ứng với hai không gian mô hình khác nhau:
+\begin{equation}
+\label{eq:graph-mask-injectivity}
+    G_a\neq G_b \quad \Rightarrow \quad M_{G_a}\neq M_{G_b}.
+\end{equation}
+Do đó, so sánh hai đồ thị không chỉ là so sánh hai danh sách cạnh, mà là so sánh hai mô hình AERCA được fine-tune dưới hai ràng buộc cấu trúc khác nhau.
+
+Sau khi tối ưu dưới mask \(M_G\), đồ thị ứng viên được đánh giá bằng lỗi dự báo trên tập validation:
+\begin{equation}
+\label{eq:validation-mse}
+    \mathrm{MSE}(G)=\frac{1}{T_{val}}\sum_{t\in\mathcal{T}_{val}}\left\|X_t-\hat{X}^{(G)}_t\right\|_2^2,
+\end{equation}
+trong đó \(\hat{X}^{(G)}_t\) là dự báo của AERCA khi bị ràng buộc bởi mask \(M_G\), \(\mathcal{T}_{val}\) là tập chỉ số kiểm chứng và \(T_{val}=|\mathcal{T}_{val}|\). MSE đo mức độ phù hợp dự báo của cấu trúc ứng viên, nhưng nếu chỉ tối thiểu hóa MSE, đồ thị dày có thể được ưu tiên vì có nhiều bậc tự do hơn.
+
+Vì vậy, CausClass dùng điểm số BIC-style để cân bằng lỗi dự báo và độ phức tạp. Với \(n\) mẫu thời gian, \(|E|\) cạnh liên hành vi và hệ số phạt cạnh \(\lambda\), đồ án sử dụng
+\begin{equation}
+\label{eq:bic-star}
+    \mathrm{BIC}^{\star}=n\log(\mathrm{MSE}+\epsilon)+\lambda |E|\log n.
+\end{equation}
+Điểm số này mang tính BIC-style chứ không khẳng định là BIC thống kê chính xác cho mô hình nơ-ron. Vai trò của nó là chọn đồ thị vừa dự báo tốt vừa đủ gọn để diễn giải.
+
+Với một thao tác thêm một cạnh, ứng viên chỉ đáng được ưu tiên khi mức giảm MSE đủ trả cho phạt độ phức tạp mới:
+\begin{equation}
+\label{eq:bic-improvement}
+    n\log\left(\frac{\mathrm{MSE}_{old}}{\mathrm{MSE}_{new}}\right)>\lambda\log n.
+\end{equation}
+Ngược lại, khi xóa một cạnh, đồ thị có thể chấp nhận MSE tăng nhẹ nếu phần giảm độ phức tạp bù lại. Nguyên tắc này làm cho đồ thị cuối cùng không chỉ là đồ thị khớp dữ liệu nhất, mà là đồ thị có đánh đổi hợp lý giữa dự báo và khả năng kiểm tra.
+
+Khi áp dụng cùng nguyên tắc phạt cạnh cho các chuỗi có độ dài khác nhau, hệ số \(\lambda\) được chọn trong phần thiết lập thực nghiệm để giữ cân bằng giữa độ khớp dự báo và độ thưa của đồ thị. Cách chọn giá trị cụ thể được báo cáo ở Chương 4.
+
+Nhờ cơ chế mask và điểm số này, AERCA trong CausClass vừa cung cấp tín hiệu cấu trúc ban đầu vừa đóng vai trò verifier cho các đồ thị do tìm kiếm sinh ra. Đây là điểm khác biệt so với việc dùng AERCA một lần rồi nhận trực tiếp đồ thị thô: mọi chỉnh sửa đồ thị đều phải được kiểm tra lại dưới cùng nguyên tắc dự báo và phạt độ phức tạp.
