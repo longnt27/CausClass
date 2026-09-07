@@ -57,11 +57,12 @@ jobs:
                   path.parent.mkdir(parents=True, exist_ok=True)
                   path.write_bytes(contents)
           print(f'Applied {len(prepared)} verified file changes.')
-          # Keep both PyTorch and its vision extension on matching CPU wheels.
           path = Path('pyproject.toml')
           text = path.read_text().replace('vision = ["opencv-python', 'vision = ["torchvision>=0.21,<1", "opencv-python')
           text += "torchvision = [{ index = \"pytorch-cpu\", marker = \"sys_platform == 'linux' or sys_platform == 'win32'\" }]\n"
           path.write_text(text)
+          path = Path('.gitignore')
+          path.write_text(path.read_text() + '\n# CI evidence is uploaded, not committed\ntest-results.xml\n')
           PY
       - name: Resolve a reproducible CPU dependency environment
         run: |
@@ -75,14 +76,18 @@ jobs:
           uv run --no-sync pytest --cov --cov-report=term-missing --cov-report=xml --junitxml=test-results.xml
           uv run --no-sync causclass-smoke --output-dir output/bootstrap-smoke --seed 42
           uv run --no-sync python -m build
-      - name: Commit validated code and remove one-time transport files
+      - name: Commit validated non-workflow source
         run: |
           rm -rf .migration
-          rm .github/workflows/apply-research-upgrade-once.yml
+          # The Actions token cannot write workflow files. The connected GitHub
+          # account will install CI and remove the temporary workflows separately.
+          git restore --source=HEAD -- .github/workflows
+          rm .github/workflows/ci.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
-          git commit -m 'feat: consolidate research workflow with protocol-v2 fixes, tests, locked environment and reproducible report build'
+          git diff --cached --exit-code -- .github/workflows
+          git commit -m 'feat: add protocol-v2 verifier fixes, regression tests, locked environment and research documentation'
           git push origin HEAD:refs/heads/research/integrate-report-20260907
           git archive --format=tar.gz --output=validated-source.tar.gz HEAD
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
