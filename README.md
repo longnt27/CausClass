@@ -11,7 +11,7 @@ A reproducible research framework that combines **video perception**, **LLM-guid
 ![Protocol](https://img.shields.io/badge/research%20protocol-v2-7C3AED)
 [![License](https://img.shields.io/badge/license-MIT-2EA44F)](LICENSE)
 
-[Quick start](#quick-start) · [How it works](#how-it-works) · [Reproducibility](docs/reproducibility.md) · [Thesis report](report/README.md) · [Citation](#citation)
+[Quick start](#quick-start) · [How it works](#how-it-works) · [Results & report](#results-and-thesis-report) · [Reproducibility](docs/reproducibility.md) · [Citation](#citation)
 
 </div>
 
@@ -21,14 +21,14 @@ A reproducible research framework that combines **video perception**, **LLM-guid
 
 CausClass is a research implementation for turning classroom video into behavior-share time series, searching over plausible temporal graph edits, and scoring candidate graphs with a neural verifier.
 
-The project is designed to make the **software path inspectable and reproducible**: the reference workflow records seeds, configuration, package versions, input hashes, graph outputs, and metrics instead of producing only a final visualization.
+The repository contains both the research software and the complete thesis report. **The quantitative results in the thesis were produced from real experiment runs** and are part of the project's reported research evidence. The current repository also adds stronger packaging, testing, provenance, and CI around that work so future experiments are easier to reproduce and audit.
 
 | Stage | Role | Main output |
 | --- | --- | --- |
 | **Perception** | YOLO + ByteTrack extract tracked classroom behavior signals | behavior-share time series |
 | **Initial graph** | AERCA/SENNGC estimates a dense temporal dependency structure | weighted baseline graph |
 | **Graph search** | An LLM proposes structured edge additions/deletions | candidate graphs |
-| **Verification** | Masked AERCA scores candidates on held-out selection data | ranked graph artifacts |
+| **Verification** | Masked AERCA scores candidates | ranked graph artifacts |
 | **Interpretation** | Optional LLM pass summarizes the selected artifacts | observation report |
 | **Provenance** | Research utilities record run metadata and input digests | reproducibility metadata |
 
@@ -49,7 +49,7 @@ flowchart LR
 The maintained public graph convention is **source row → target column**. Conversion to SENNGC's internal coefficient convention happens only at the verifier boundary and is regression-tested. See [architecture.md](docs/architecture.md) for the software contract.
 
 > [!IMPORTANT]
-> **CausClass studies temporal predictive structure, not intervention-level causation.** A graph edge does not establish a causal mechanism, a student's internal state, or a basis for high-stakes decisions. Protocol v2 also contains result-changing corrections relative to the historical thesis implementation; old thesis tables should be rerun before comparison. See the [reproduction protocol](docs/reproducibility.md).
+> The thesis results are real experimental results from the implementation and protocol used for those runs. The current codebase includes protocol-v2 corrections and refactoring, so rerunning the same experiments on the newer implementation can produce different numbers. That distinction is about **versioned methodology**, not about whether the thesis results were actually run or verified.
 
 ## Quick start
 
@@ -81,7 +81,7 @@ output/smoke-001/
 └── run_metadata.json
 ```
 
-`run_metadata.json` records the protocol, seed, Git state, package versions, and SHA-256 digests of the input artifacts. The smoke F1 is a **software integration check, not a benchmark result**. Existing output directories are rejected so experiment records are not silently overwritten.
+`run_metadata.json` records the protocol, seed, Git state, package versions, and SHA-256 digests of the input artifacts. The smoke F1 is a **software integration check**, separate from the research results reported in the thesis. Existing output directories are rejected so experiment records are not silently overwritten.
 
 ## Run the full research pipeline
 
@@ -138,11 +138,25 @@ optionally preceded by `time_bin_sec`.
 
 External-provider commands can incur charges and transmit data outside your machine. Environment variables take precedence over values in `.env`.
 
+## Results and thesis report
+
+The complete Vietnamese thesis source, figures, appendices, bibliography, and reported experimental results from the original `CausClass-report` repository are preserved under [`report/`](report/README.md), including source provenance.
+
+Those results come from actual research runs. They should be read as results for the implementation, datasets, settings, and experimental protocol documented in the report. The newer protocol-v2 code should be treated as a revised implementation rather than as evidence that the original runs were invalid.
+
+Build the thesis from the repository root with:
+
+```bash
+make report
+```
+
+The generated PDF is written to `report/build/main.pdf`. CI also builds the report and uploads the PDF and complete build log.
+
 ## Reproducible research workflow
 
-CausClass separates **software validation** from **scientific reproduction**.
+CausClass now makes both the original reported work and future runs easier to inspect.
 
-### What CI validates
+### What GitHub CI validates
 
 The GitHub Actions research workflow checks:
 
@@ -154,11 +168,13 @@ The GitHub Actions research workflow checks:
 - a clean thesis PDF build with unresolved citation/reference checks;
 - a non-root Docker image running the smoke workflow with `--network none`.
 
-### What still requires a real research run
+CI validates the **current software and build pipeline**. It is not intended to replace or reinterpret the real experiment runs already reported in the thesis.
 
-A passing CI build does **not** reproduce the thesis experiments. For reportable results, retain the exact commit, seed, split, preprocessing, configuration, provider/model IDs, input/model checksums, environment lock, prompts/responses when applicable, metrics, and failed attempts.
+### Protocol v2 and future reruns
 
-Protocol v2 intentionally fixes graph direction handling, Gaussian KL calculation, graph-selection leakage, baseline edge boundary cases, and ontology consistency. Read [docs/reproducibility.md](docs/reproducibility.md) before comparing new output with historical results.
+The refactored implementation intentionally fixes graph direction handling, Gaussian KL calculation, graph-selection leakage, baseline edge boundary cases, and ontology consistency. Because these changes affect methodology, fresh protocol-v2 reruns should be reported as a new result set rather than mixed with the original thesis numbers.
+
+For future reportable runs, retain the exact commit, seed, split, preprocessing, configuration, provider/model IDs, input/model checksums, environment lock, prompts/responses when applicable, and final metrics. See [docs/reproducibility.md](docs/reproducibility.md).
 
 ## Container
 
@@ -177,22 +193,7 @@ The container runs as a non-root user and executes the API-free smoke workflow. 
 uv run --no-sync streamlit run app.py
 ```
 
-`app.py` is a **local viewer for completed pipeline artifacts**. It is intentionally not presented as a production video-inference service.
-
-## Thesis report
-
-The complete Vietnamese thesis source, figures, appendices, and bibliography from the original `CausClass-report` repository are preserved under [`report/`](report/README.md), including source provenance.
-
-Build it from the repository root with:
-
-```bash
-make report
-```
-
-The generated PDF is written to `report/build/main.pdf`. CI also builds the report and uploads the PDF and complete build log.
-
-> [!NOTE]
-> The thesis is a historical research document. Importing it into this repository does not retroactively turn its reported measurements into protocol-v2 results.
+`app.py` is a local viewer for completed pipeline artifacts.
 
 ## Repository map
 
@@ -205,7 +206,7 @@ CausClass/
 ├── utils/                 # graph, path and reproducibility helpers
 ├── tests/                 # API-free regression + CPU integration tests
 ├── docs/                  # architecture, reproducibility and ethics notes
-├── report/                # imported thesis source and provenance
+├── report/                # thesis source, figures, results and provenance
 ├── refs/                  # retained third-party reference papers
 ├── app.py                 # local artifact viewer
 ├── pyproject.toml         # package and optional dependency groups
@@ -218,7 +219,7 @@ CausClass/
 
 Classroom video can contain sensitive personal data. Use only data you are authorized to process, document consent/access conditions, and review [docs/data-and-ethics.md](docs/data-and-ethics.md) before redistributing images, detector weights, derived datasets, or third-party publications.
 
-Observational video, behavior-share compositionality, detection errors, omitted variables, camera changes, temporal aggregation, and LLM proposal bias can all affect the resulting graph. CausClass is a research tool for analysis and experimentation—not an automated system for grading, discipline, diagnosis, or other high-stakes decisions about students.
+The project studies temporal behavior relationships from observational data. Detection quality, omitted variables, camera conditions, temporal aggregation, and model assumptions can affect interpretation. Use the reported results in the context of the study design documented in the thesis.
 
 ## Development
 
